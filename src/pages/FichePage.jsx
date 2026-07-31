@@ -1,9 +1,10 @@
+import UserMenu from '../components/UserMenu';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Save, Archive, Printer } from 'lucide-react';
+import { ArrowLeft, Save, Archive, Printer, LogOut, Home } from 'lucide-react';
 import { Select, Input, TextArea, Toggle, ChipGroup, Section } from '../components/Fields';
 import * as K from '../constants';
 
@@ -62,7 +63,7 @@ export default function FichePage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <header className="sticky top-0 z-20 shadow-md no-print" style={{ background: 'linear-gradient(135deg, #3A2020, #4A2C2A)' }}>
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => navigate('/')} className="text-white p-2 hover:bg-white/10 rounded-lg shrink-0">
               <ArrowLeft size={18} />
@@ -81,11 +82,17 @@ export default function FichePage() {
                 <Archive size={17} />
               </button>
             )}
+            <a href="/" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex" title="Retour portail" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex items-center gap-1 text-xs font-medium">
+              <Home size={15} /> Portail
+            </a>
+            <button onClick={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} className="p-2 rounded-lg text-white hover:bg-white/10" title="Déconnexion" className="p-2 rounded-lg text-white hover:bg-white/10 flex items-center gap-1 text-xs font-medium">
+              <LogOut size={15} /> Se déconnecter
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 pt-4 no-print">
+      <div className="max-w-5xl mx-auto px-4 pt-4 no-print">
         <div className="flex gap-1 overflow-x-auto bg-white rounded-xl p-1 shadow-sm border border-gray-100">
           {K.TABS.map(t => (
             <button
@@ -100,7 +107,7 @@ export default function FichePage() {
         </div>
       </div>
 
-      <main className="max-w-4xl mx-auto px-4 py-4 space-y-4">
+      <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
         <fieldset disabled={ro} className={ro ? 'opacity-70' : ''}>
 
           {tab === 'nursing' && (
@@ -254,7 +261,7 @@ export default function FichePage() {
 
       {isManager() && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 no-print">
-          <div className="max-w-4xl mx-auto flex items-center gap-3">
+          <div className="max-w-5xl mx-auto flex items-center gap-3">
             <button
               onClick={save}
               disabled={!dirty || saving}

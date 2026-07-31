@@ -1,9 +1,10 @@
+import UserMenu from '../components/UserMenu';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { Search, LogOut, Plus, X, Archive, RotateCcw, AlertTriangle, Scale, MoreVertical, DoorOpen, Users } from 'lucide-react';
+import { Search, LogOut, Plus, X, Archive, RotateCcw, AlertTriangle, Scale, MoreVertical, DoorOpen, Users, Home } from 'lucide-react';
 
 function etage(chambre) {
   const f = Math.floor(chambre / 100);
@@ -62,7 +63,7 @@ function NouveauModal({ onClose, onSaved }) {
 
 export default function ListePage() {
   const navigate = useNavigate();
-  const { isManager } = useAuth();
+  const { isManager, user } = useAuth();
   const [residents, setResidents] = useState([]);
   const [search, setSearch] = useState('');
   const [showArchives, setShowArchives] = useState(false);
@@ -160,25 +161,24 @@ export default function ListePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <header className="sticky top-0 z-10 shadow-md" style={{ background: 'linear-gradient(135deg, #3A2020, #4A2C2A)' }}>
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🏠</span>
-            <span className="text-white font-bold text-sm">Résidents</span>
-            <span className="text-xs ml-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Arc en Ciel</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button onClick={() => navigate('/repartition')} className="p-2 rounded-lg text-white hover:bg-white/10">
-              <Users size={18} />
-            </button>
-            <a href="/" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex">
-              <LogOut size={18} />
-            </a>
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 pt-4 pb-4" onClick={() => setMenuOpen(null)}>
+        <div className="rounded-2xl px-5 py-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #3A2020, #5C3A37)' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img src="https://monaec.fr/logo-aec.jpg" alt="Arc en Ciel" className="h-12 rounded-lg" />
+              <div>
+                <h1 className="text-base font-bold">Résidents</h1>
+                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>Résidence Arc en Ciel</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigate('/repartition')} className="p-2 rounded-lg text-white hover:bg-white/10" title="Répartition">
+                <Users size={18} />
+              </button>
+              <UserMenu user={user} onLogout={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} />
+            </div>
           </div>
         </div>
-      </header>
-
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-4" onClick={() => setMenuOpen(null)}>
         <div className="flex flex-col gap-2 mb-4">
           <div className="flex items-center gap-2 mb-1">
             <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm border border-gray-100 flex-1">

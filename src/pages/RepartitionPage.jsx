@@ -1,9 +1,10 @@
+import UserMenu from '../components/UserMenu';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Plus, Settings, ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react';
+import { ArrowLeft, Plus, Settings, ChevronLeft, ChevronRight, RefreshCw, X, LogOut, Home } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -210,6 +211,12 @@ export default function RepartitionPage() {
                 <Settings size={17} />
               </button>
             )}
+            <a href="/" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex" title="Retour portail" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex items-center gap-1 text-xs font-medium">
+              <Home size={15} /> Portail
+            </a>
+            <button onClick={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} className="p-2 rounded-lg text-white hover:bg-white/10" title="Déconnexion" className="p-2 rounded-lg text-white hover:bg-white/10 flex items-center gap-1 text-xs font-medium">
+              <LogOut size={15} /> Se déconnecter
+            </button>
           </div>
         </div>
         <div className="px-4 pb-3 flex items-center gap-3">
@@ -338,7 +345,7 @@ function ConfigModal({ configs, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="font-bold text-gray-900">Configurations de répartition</h2>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
