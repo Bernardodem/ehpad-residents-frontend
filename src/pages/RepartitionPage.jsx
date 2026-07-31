@@ -71,13 +71,14 @@ function SoignantColonne({ soignant, residents, onRemove, isManager }) {
 }
 
 // Zone non affectés droppable
-function NonAffectesZone({ residents }) {
+function NonAffectesZone({ residents, filtres }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'non-affectes' });
   return (
     <div>
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
         Non affectés ({residents.length})
       </p>
+      {filtres}
       <div ref={setNodeRef}
         className={`min-h-16 rounded-xl p-2 space-y-1.5 border-2 transition-colors ${isOver ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
         {residents.map(r => <ResidentCard key={r.id} resident={r} />)}
@@ -91,7 +92,8 @@ function NonAffectesZone({ residents }) {
 
 export default function RepartitionPage() {
   const navigate = useNavigate();
-  const { isManager } = useAuth();
+  const { isManager, user } = useAuth();
+  const [filtreEtageNonAff, setFiltreEtageNonAff] = useState('');
   const [configs, setConfigs] = useState([]);
   const [configId, setConfigId] = useState('');
   const [config, setConfig] = useState(null);
@@ -193,46 +195,55 @@ export default function RepartitionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="sticky top-0 z-20 shadow-md" style={{ background: 'linear-gradient(135deg, #3A2020, #4A2C2A)' }}>
-        <div className="px-4 h-14 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => navigate('/residents')} className="text-white p-2 hover:bg-white/10 rounded-lg shrink-0">
-              <ArrowLeft size={18} />
-            </button>
-            <span className="text-white font-bold text-sm">Répartition</span>
+      <div className="max-w-5xl w-full mx-auto px-4 pt-4">
+        <div className="rounded-2xl px-5 py-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #3A2020, #5C3A37)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <button onClick={() => navigate('/')} className="text-white p-2 hover:bg-white/10 rounded-lg">
+                <ArrowLeft size={18} />
+              </button>
+              <img src="https://monaec.fr/logo-aec.jpg" alt="Arc en Ciel" className="h-12 rounded-lg" />
+              <div>
+                <h1 className="text-base font-bold">Répartition</h1>
+                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>Résidence Arc en Ciel</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <select className="text-xs px-2 py-1.5 rounded-lg bg-white/10 text-white border border-white/20"
+                value={configId} onChange={e => setConfigId(e.target.value)}>
+                {configs.map(c => <option key={c.id} value={c.id} style={{ color: '#333' }}>{c.nom}</option>)}
+              </select>
+              {isManager() && (
+                <button onClick={() => setShowConfigModal(true)} className="p-2 rounded-lg text-white hover:bg-white/10">
+                  <Settings size={17} />
+                </button>
+              )}
+              <UserMenu user={user} onLogout={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <select className="text-xs px-2 py-1.5 rounded-lg bg-white/10 text-white border border-white/20"
-              value={configId} onChange={e => setConfigId(e.target.value)}>
-              {configs.map(c => <option key={c.id} value={c.id} style={{ color: '#333' }}>{c.nom}</option>)}
-            </select>
+          <div className="flex items-center gap-3">
+            <button onClick={() => changeDate(-1)} className="text-white p-1 hover:bg-white/10 rounded"><ChevronLeft size={18} /></button>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className="text-sm px-3 py-1.5 rounded-lg bg-white/10 text-white border border-white/20" />
+            <button onClick={() => changeDate(1)} className="text-white p-1 hover:bg-white/10 rounded"><ChevronRight size={18} /></button>
             {isManager() && (
-              <button onClick={() => setShowConfigModal(true)} className="p-2 rounded-lg text-white hover:bg-white/10">
-                <Settings size={17} />
+              <button onClick={initAffectations} className="text-white p-2 hover:bg-white/10 rounded-lg ml-auto" title="Initialiser depuis les défauts">
+                <RefreshCw size={17} />
               </button>
             )}
-            <a href="/" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex" title="Retour portail" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex items-center gap-1 text-xs font-medium">
-              <Home size={15} /> Portail
-            </a>
-            <button onClick={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} className="p-2 rounded-lg text-white hover:bg-white/10" title="Déconnexion" className="p-2 rounded-lg text-white hover:bg-white/10 flex items-center gap-1 text-xs font-medium">
-              <LogOut size={15} /> Se déconnecter
-            </button>
           </div>
         </div>
-        <div className="px-4 pb-3 flex items-center gap-3">
-          <button onClick={() => changeDate(-1)} className="text-white p-1 hover:bg-white/10 rounded"><ChevronLeft size={18} /></button>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)}
-            className="text-sm px-3 py-1.5 rounded-lg bg-white/10 text-white border border-white/20 flex-1 max-w-xs" />
-          <button onClick={() => changeDate(1)} className="text-white p-1 hover:bg-white/10 rounded"><ChevronRight size={18} /></button>
-          {isManager() && (
-            <button onClick={initAffectations} className="text-white p-2 hover:bg-white/10 rounded-lg ml-auto" title="Initialiser depuis les défauts">
-              <RefreshCw size={17} />
-            </button>
-          )}
-        </div>
-      </header>
+      </div>
 
-      <main className="flex-1 p-4 overflow-x-auto">
+      <div className="max-w-5xl w-full mx-auto px-4 mb-4">
+        <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
+          <a href="/residents" className="flex-1 py-2 px-3 rounded-lg text-sm font-medium text-center text-gray-500 hover:text-gray-700 no-underline">Résidents</a>
+          <span className="flex-1 py-2 px-3 rounded-lg text-sm font-medium text-center text-white" style={{ background: '#4A2C2A' }}>Répartition</span>
+          <a href="/residents" className="flex-1 py-2 px-3 rounded-lg text-sm font-medium text-center text-gray-500 hover:text-gray-700 no-underline flex items-center justify-center gap-2">Archives</a>
+        </div>
+      </div>
+
+            <main className="flex-1 px-4 py-4 overflow-x-auto max-w-5xl w-full mx-auto">
         {loading ? (
           <div className="text-center py-16 text-gray-400">Chargement...</div>
         ) : !config ? (
@@ -242,19 +253,52 @@ export default function RepartitionPage() {
           </div>
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="mb-4">
-              <NonAffectesZone residents={nonAffectes} />
-            </div>
-            <div className="flex gap-3 pb-4 min-w-max">
-              {config.soignants.map(s => (
-                <SoignantColonne
-                  key={s.id}
-                  soignant={s}
-                  residents={affParSoignant[s.id] || []}
-                  onRemove={desaffecter}
-                  isManager={isManager()}
+            <div className="flex gap-4 items-start">
+              <div className="w-48 shrink-0" style={{ position: 'sticky', top: '1rem', alignSelf: 'flex-start', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+                <NonAffectesZone
+                  residents={nonAffectes.filter(r => {
+                    if (!filtreEtageNonAff) return true;
+                    const etages = { 'RDC': [1], '1er étage': [2, 3], '2ème étage': [4, 5] };
+                    const appt = Math.floor(r.chambre / 100);
+                    return (etages[filtreEtageNonAff] || []).includes(appt);
+                  })}
+                  filtres={
+                    <div className="flex justify-around mt-1 mb-2">
+                      {[['RDC', 'RDC'], ['1er étage', '1er'], ['2ème étage', '2ème']].map(([val, label]) => (
+                        <button key={val} onClick={() => setFiltreEtageNonAff(f => f === val ? '' : val)}
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{ background: filtreEtageNonAff === val ? '#C9A84C' : '#4A2C2A', color: 'white', opacity: filtreEtageNonAff && filtreEtageNonAff !== val ? 0.4 : 1 }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  }
                 />
-              ))}
+              </div>
+              <div className="flex-1 space-y-6 pb-4">
+                {Object.entries(
+                  config.soignants.reduce((acc, s) => {
+                    const etage = s.etage || 'Autre';
+                    (acc[etage] = acc[etage] || []).push(s);
+                    return acc;
+                  }, {})
+                ).map(([etage, soignants]) => (
+                  <div key={etage}>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{etage}</p>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {soignants.map(s => (
+                        <SoignantColonne
+                          key={s.id}
+                          soignant={s}
+                          residents={affParSoignant[s.id] || []}
+                          onRemove={desaffecter}
+                          isManager={isManager()}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
             <DragOverlay>
               {activeResident && (

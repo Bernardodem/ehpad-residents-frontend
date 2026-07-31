@@ -171,12 +171,7 @@ export default function ListePage() {
                 <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>Résidence Arc en Ciel</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/repartition')} className="p-2 rounded-lg text-white hover:bg-white/10" title="Répartition">
-                <Users size={18} />
-              </button>
-              <UserMenu user={user} onLogout={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} />
-            </div>
+            <UserMenu user={user} onLogout={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} />
           </div>
         </div>
         <div className="flex flex-col gap-2 mb-4">
@@ -187,23 +182,24 @@ export default function ListePage() {
                 style={!showArchives ? { background: '#4A2C2A' } : {}}>
                 Résidents
               </button>
+              <a href="/residents/repartition"
+                className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 text-gray-500 hover:text-gray-700 no-underline">
+                <Users size={14} /> Répartition
+              </a>
               <button onClick={() => setShowArchives(true)}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${showArchives ? 'text-white' : 'text-gray-500 hover:text-gray-700'}`}
                 style={showArchives ? { background: '#4A2C2A' } : {}}>
                 <Archive size={14} /> Archives
               </button>
             </div>
-            {isManager() && !showArchives && (
-              <button onClick={() => setShowNew(true)} className="px-4 py-2 rounded-xl text-white text-sm font-medium flex items-center gap-2 whitespace-nowrap shrink-0" style={{ background: '#4A2C2A' }}>
-                <Plus size={16} /> Nouveau
-              </button>
-            )}
+
           </div>
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input className="inp pl-9" placeholder="Rechercher un nom ou une chambre..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <div className="flex items-center gap-8 mt-3 mb-4 flex-wrap justify-center">
+          <div className="flex items-center justify-between mt-3 mb-4">
+            <div className="flex items-center gap-8 flex-wrap justify-center">
             <div className="flex items-center gap-3">
               <span className="text-xs font-semibold text-gray-600 shrink-0">Étage</span>
               <div className="flex gap-2">
@@ -233,6 +229,12 @@ export default function ListePage() {
                 className="px-3 py-1.5 rounded-xl text-xs font-bold text-white"
                 style={{ background: '#4A2C2A' }}>
                 Réinitialiser
+              </button>
+            )}
+            </div>
+            {isManager() && !showArchives && (
+              <button onClick={() => setShowNew(true)} className="px-4 py-2 rounded-xl text-white text-sm font-medium flex items-center gap-2 whitespace-nowrap" style={{ background: '#4A2C2A' }}>
+                <Plus size={16} /> Nouveau
               </button>
             )}
           </div>
