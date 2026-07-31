@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { Search, LogOut, Plus, X, Archive, RotateCcw, AlertTriangle, Scale, MoreVertical, DoorOpen } from 'lucide-react';
+import { Search, LogOut, Plus, X, Archive, RotateCcw, AlertTriangle, Scale, MoreVertical, DoorOpen, Users } from 'lucide-react';
 
 function etage(chambre) {
   const f = Math.floor(chambre / 100);
@@ -167,9 +167,14 @@ export default function ListePage() {
             <span className="text-white font-bold text-sm">Résidents</span>
             <span className="text-xs ml-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Arc en Ciel</span>
           </div>
-          <a href="/" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex">
-            <LogOut size={18} />
-          </a>
+          <div className="flex items-center gap-1">
+            <button onClick={() => navigate('/repartition')} className="p-2 rounded-lg text-white hover:bg-white/10">
+              <Users size={18} />
+            </button>
+            <a href="/" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex">
+              <LogOut size={18} />
+            </a>
+          </div>
         </div>
       </header>
 

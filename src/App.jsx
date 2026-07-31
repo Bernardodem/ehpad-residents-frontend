@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import ListePage from './pages/ListePage';
 import FichePage from './pages/FichePage';
+import RepartitionPage from './pages/RepartitionPage';
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<ListePage />} />
           <Route path="/fiche/:id" element={<FichePage />} />
+          <Route path="/repartition" element={<RepartitionPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
