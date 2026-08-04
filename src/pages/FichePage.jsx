@@ -98,14 +98,6 @@ export default function FichePage() {
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Chambre {form.chambre}</p>
             </div>
             <div className="flex items-center gap-2 justify-end shrink-0">
-              <button onClick={() => window.print()} className="p-2 rounded-lg text-white hover:bg-white/10">
-                <Printer size={17} />
-              </button>
-              {isManager() && (
-                <button onClick={archiver} className="p-2 rounded-lg text-white hover:bg-white/10" title="Archiver">
-                    <Archive size={17} />
-                  </button>
-                )}
                 <a href="/" className="hidden sm:block p-2 rounded-lg text-white hover:bg-white/10" title="Retour au portail">
                   <Home size={17} />
                 </a>
@@ -123,12 +115,12 @@ export default function FichePage() {
         </div>
 
       <div className="max-w-5xl mx-auto px-4 pt-4 no-print">
-        <div className="flex gap-1 overflow-x-auto bg-white rounded-xl p-1 shadow-sm border border-gray-100">
+        <div className="flex gap-1 overflow-x-auto sm:overflow-visible bg-white rounded-xl p-1 shadow-sm border border-gray-100">
           {K.TABS.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`shrink-0 py-2 px-3 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${tab === t.id ? 'text-white' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`shrink-0 sm:flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${tab === t.id ? 'text-white' : 'text-gray-500 hover:text-gray-700'}`}
               style={tab === t.id ? { background: '#4A2C2A' } : {}}
             >
               <span className="mr-1">{t.icon}</span>{t.label}
@@ -291,16 +283,21 @@ export default function FichePage() {
 
       {isManager() && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 no-print">
-          <div className="max-w-5xl mx-auto flex items-center gap-3">
+          <div className="max-w-5xl mx-auto flex items-center justify-center gap-3">
             <button
               onClick={save}
               disabled={!dirty || saving}
-              className="flex-1 py-3 rounded-xl text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="px-8 py-3 rounded-xl text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               style={{ background: '#4A2C2A' }}
             >
               <Save size={17} />
               {saving ? 'Enregistrement...' : dirty ? 'Enregistrer les modifications' : 'Aucune modification'}
             </button>
+            {isManager() && (
+              <button onClick={archiver} className="px-4 py-3 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 flex items-center gap-2 text-sm font-medium" title="Archiver ce résident">
+                <Archive size={17} /> Archiver ce résident
+              </button>
+            )}
           </div>
         </div>
       )}
