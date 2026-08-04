@@ -17,6 +17,15 @@ function etage(chambre) {
 function NouveauModal({ onClose, onSaved }) {
   const [form, setForm] = useState({ chambre: '', nom: '', prenom: '' });
   const [loading, setLoading] = useState(false);
+  const [chambresDisponibles, setChambresDisponibles] = useState([]);
+
+  useEffect(() => {
+    api.get('/residents/chambres/disponibles').then(({ data }) => {
+      setChambresDisponibles(data);
+      const premierLibre = data.find(c => c.libre);
+      if (premierLibre) setForm(p => ({ ...p, chambre: String(premierLibre.chambre) }));
+    });
+  }, []);
 
   const save = async () => {
     if (!form.chambre || !form.nom || !form.prenom) { toast.error('Tous les champs sont requis'); return; }
@@ -39,7 +48,21 @@ function NouveauModal({ onClose, onSaved }) {
         <div className="space-y-4">
           <div>
             <label className="lbl">N° de chambre</label>
-            <input className="inp" type="number" value={form.chambre} onChange={e => setForm(p => ({ ...p, chambre: e.target.value }))} />
+            <select className="inp" value={form.chambre} onChange={e => setForm(p => ({ ...p, chambre: e.target.value }))}>
+              <option value="">— Choisir —</option>
+              {chambresDisponibles.filter(c => c.libre).length > 0 && (
+                <optgroup label="Chambres libres">
+                  {chambresDisponibles.filter(c => c.libre).map(c => (
+                    <option key={c.chambre} value={c.chambre}>{c.chambre}</option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Chambres occupées">
+                {chambresDisponibles.filter(c => !c.libre).map(c => (
+                  <option key={c.chambre} value={c.chambre}>{c.chambre}</option>
+                ))}
+              </optgroup>
+            </select>
           </div>
           <div>
             <label className="lbl">Nom</label>
