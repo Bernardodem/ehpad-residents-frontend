@@ -1,4 +1,5 @@
 import UserMenu from '../components/UserMenu';
+import Footer from '../components/Footer';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -282,8 +283,8 @@ export default function FichePage() {
       </main>
 
       {isManager() && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 no-print">
-          <div className="max-w-5xl mx-auto flex items-center justify-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 pb-4 no-print">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-center gap-3">
             <button
               onClick={save}
               disabled={!dirty || saving}
@@ -301,6 +302,7 @@ export default function FichePage() {
           </div>
         </div>
       )}
+      <Footer appSource="Résidents" />
     </div>
   );
 }

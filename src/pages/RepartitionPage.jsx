@@ -1,4 +1,5 @@
 import UserMenu from '../components/UserMenu';
+import Footer from '../components/Footer';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -290,6 +291,7 @@ export default function RepartitionPage() {
           </DndContext>
         )}
       </main>
+      <Footer appSource="Résidents" />
 
       {showConfigModal && (
         <ConfigModal configs={configs} onClose={() => setShowConfigModal(false)}

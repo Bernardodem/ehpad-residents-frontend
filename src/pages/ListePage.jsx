@@ -1,4 +1,5 @@
 import UserMenu from '../components/UserMenu';
+import Footer from '../components/Footer';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -362,6 +363,7 @@ export default function ListePage() {
           </div>
         )}
       </main>
+      <Footer appSource="Résidents" />
 
       {changeChambre && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setChangeChambre(null)}>
