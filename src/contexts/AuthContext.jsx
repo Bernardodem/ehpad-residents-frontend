@@ -6,6 +6,8 @@ const RESIDENTS_APP_ID = '__RESIDENTS_APP_ID__';
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [viewAs, setViewAsState] = useState(() => localStorage.getItem('test_view_as') || 'admin');
+  const setViewAs = (v) => { localStorage.setItem('test_view_as', v); setViewAsState(v); };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -32,9 +34,13 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const isAdmin = () => user && ['admin_etablissement', 'admin_groupe'].includes(user.role_global);
+  const isRealAdmin = user && ['admin_etablissement', 'admin_groupe'].includes(user.role_global);
+  const isAdmin = () => isRealAdmin && viewAs === 'admin';
   const isManager = () => {
-    if (isAdmin()) return true;
+    if (isRealAdmin && viewAs === 'admin') return true;
+    if (isRealAdmin && viewAs === 'gestionnaire') return true;
+    if (isRealAdmin && viewAs === 'utilisateur') return false;
+    if (isRealAdmin) return true;
     const app = (user?.apps || []).find(a => a.id === RESIDENTS_APP_ID);
     return app && ['gestionnaire', 'admin'].includes(app.role);
   };
@@ -42,7 +48,7 @@ export function AuthProvider({ children }) {
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">Chargement...</div>;
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, isManager }}>
+    <AuthContext.Provider value={{ user, isAdmin, isManager, isRealAdmin, viewAs, setViewAs }}>
       {children}
     </AuthContext.Provider>
   );

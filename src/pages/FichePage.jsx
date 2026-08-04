@@ -8,10 +8,25 @@ import { ArrowLeft, Save, Archive, Printer, LogOut, Home } from 'lucide-react';
 import { Select, Input, TextArea, Toggle, ChipGroup, Section } from '../components/Fields';
 import * as K from '../constants';
 
+
+const SAINTS = ["Marie","Basile","Genevieve","Odilon","Edouard","Melaine","Raymond","Lucien","Alix","Guillaume","Paulin","Tatiana","Yvette","Nina","Remi","Marcel","Roseline","Prisca","Marius","Sebastien","Agnes","Vincent","Barnard","Francois","Ananie","Paule","Angele","Thomas","Gildas","Martine","Marcelle","Ella","Theophane","Blaise","Veronique","Agathe","Gaston","Eugenie","Jacqueline","Apolline","Arnaud","Heloise","Felix","Beatrice","Valentin","Claude","Julienne","Alexis","Bernadette","Gabin","Aimee","Pierre-Damien","Isabelle","Lazare","Modeste","Romeo","Nestor","Honorine","Romain","Auguste","Aubin","Charles","Guenole","Casimir","Olive","Colette","Felicite","Jean","Francoise","Vivien","Rosine","Justine","Rodrigue","Mathilde","Louise","Benedicte","Patrice","Cyrille","Joseph","Herbert","Clemence","Lea","Victorien","Catherine","Humbert","Larissa","Habib","Gontran","Gwladys","Amedee","Benjamin","Hugues","Sandrine","Richard","Isidore","Irene","Marcellin","Jean-Baptiste","Julie","Gauthier","Fulbert","Stanislas","Jules","Ida","Maxime","Paterne","Benoit-Joseph","Anicet","Parfait","Emma","Odette","Anselme","Alexandre","Georges","Fidele","Marc","Alida","Zita","Valerie","Catherine","Robert","Jeremie","Boris","Philippe","Sylvain","Judith","Prudence","Gisele","Desire","Pacome","Solange","Estelle","Achille","Rolande","Matthias","Denise","Honore","Pascal","Eric","Yves","Bernardin","Constantin","Emile","Didier","Donatien","Sophie","Berenger","Augustin","Germain","Aymard","Ferdinand","Perrine","Justin","Blandine","Kevin","Clotilde","Igor","Norbert","Gilbert","Medard","Diane","Landry","Barnabe","Guy","Antoine","Elisee","Germaine","Jean-Francois","Herve","Leonce","Romuald","Silvere","Rodolphe","Alban","Audrey","Jean-Baptiste","Prosper","Anthelme","Fernand","Irenee","Pierre","Martial","Thierry","Martinien","Thomas","Florent","Antoine","Mariette","Raoul","Thibaut","Amandine","Ulrich","Benoit","Olivier","Henri","Camille","Donald","Carmen","Charlotte","Frederic","Arsene","Marina","Victor","Marie-Madeleine","Brigitte","Christine","Jacques","Anne","Nathalie","Samson","Marthe","Juliette","Ignace","Alphonse","Julien","Lydie","Jean-Marie","Abel","Octavien","Gaetan","Dominique","Amour","Laurent","Claire","Clarisse","Hippolyte","Evrard","Marie","Armel","Hyacinthe","Helene","Jean-Eudes","Bernard","Christophe","Fabrice","Rose","Barthelemy","Louis","Natacha","Monique","Augustin","Sabine","Fiacre","Aristide","Gilles","Ingrid","Gregoire","Rosalie","Raissa","Bertrand","Reine","Adrien","Alain","Ines","Adelphe","Apollinaire","Aime","Cyprien","Roland","Edith","Renaud","Nadege","Emilie","Davy","Matthieu","Maurice","Constant","Thecle","Hermann","Come","Vincent","Venceslas","Michel","Jerome","Therese","Leger","Gerard","Francois","Fleur","Bruno","Serge","Pelagie","Denis","Ghislain","Firmin","Wilfried","Geraud","Juste","Aurelie","Edwige","Baudouin","Luc","Rene","Adeline","Celine","Elodie","Jean","Florentin","Crepin","Dimitri","Emeline","Simon","Narcisse","Bienvenue","Quentin","Harold","Oceane","Hubert","Charles","Sylvie","Bertille","Carine","Geoffroy","Theodore","Leon","Martin","Christian","Brice","Sidoine","Albert","Marguerite","Elisabeth","Aude","Tanguy","Edmond","Rufus","Cecile","Clement","Flora","Catherine","Delphine","Severin","Jacques","Saturnin","Andre","Florence","Viviane","Xavier","Barbara","Gerald","Nicolas","Ambroise","Elfried","Pierre","Romaric","Daniel","Corentin","Lucie","Odile","Ninon","Alice","Gael","Gatien","Urbain","Theophile","Pierre","Francoise-Xaviere","Armand","Adele","Emmanuel","Etienne","Jean","Gaspard","David","Roger","Sylvestre"];
+
+function getSaintDuJour() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const start = new Date(year, 0, 1);
+  const diff = now - start;
+  const oneDay = 1000 * 60 * 60 * 24;
+  let day = Math.floor(diff / oneDay);
+  const isBissextile = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0));
+  if (!isBissextile && day >= 59) day++;
+  return SAINTS[Math.min(day, SAINTS.length - 1)] || '';
+}
+
 export default function FichePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isManager } = useAuth();
+  const { isManager, user, isRealAdmin, viewAs, setViewAs } = useAuth();
   const [tab, setTab] = useState('nursing');
   const [form, setForm] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -62,35 +77,50 @@ export default function FichePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <header className="sticky top-0 z-20 shadow-md no-print" style={{ background: 'linear-gradient(135deg, #3A2020, #4A2C2A)' }}>
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => navigate('/')} className="text-white p-2 hover:bg-white/10 rounded-lg shrink-0">
-              <ArrowLeft size={18} />
-            </button>
-            <div className="min-w-0">
-              <p className="text-white font-bold text-sm truncate">{form.prenom} {form.nom}</p>
+      <div className="max-w-5xl mx-auto px-4 pt-4 no-print">
+        <div className="rounded-2xl px-5 py-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #3A2020, #5C3A37)' }}>
+          <div className="flex sm:grid sm:grid-cols-3 items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <button onClick={() => navigate('/')} className="text-white p-2 hover:bg-white/10 rounded-lg shrink-0">
+                <ArrowLeft size={18} />
+              </button>
+              <img src="https://monaec.fr/logo-aec.jpg" alt="Arc en Ciel" className="h-10 sm:h-12 rounded-lg shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-base font-bold truncate">Bonjour, {user?.prenom}</h1>
+                <p className="text-xs leading-tight hidden sm:block" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  <br />Nous fêtons les {getSaintDuJour()}
+                </p>
+              </div>
+            </div>
+            <div className="text-center min-w-0 hidden sm:block">
+              <p className="font-bold text-base truncate">{form.prenom} {form.nom}</p>
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Chambre {form.chambre}</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => window.print()} className="p-2 rounded-lg text-white hover:bg-white/10">
-              <Printer size={17} />
-            </button>
-            {isManager() && (
-              <button onClick={archiver} className="p-2 rounded-lg text-white hover:bg-white/10" title="Archiver">
-                <Archive size={17} />
+            <div className="flex items-center gap-2 justify-end shrink-0">
+              <button onClick={() => window.print()} className="p-2 rounded-lg text-white hover:bg-white/10">
+                <Printer size={17} />
               </button>
-            )}
-            <a href="/" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex" title="Retour portail" className="p-2 rounded-lg text-white hover:bg-white/10 inline-flex items-center gap-1 text-xs font-medium">
-              <Home size={15} /> Portail
-            </a>
-            <button onClick={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} className="p-2 rounded-lg text-white hover:bg-white/10" title="Déconnexion" className="p-2 rounded-lg text-white hover:bg-white/10 flex items-center gap-1 text-xs font-medium">
-              <LogOut size={15} /> Se déconnecter
-            </button>
+              {isManager() && (
+                <button onClick={archiver} className="p-2 rounded-lg text-white hover:bg-white/10" title="Archiver">
+                    <Archive size={17} />
+                  </button>
+                )}
+                <a href="/" className="hidden sm:block p-2 rounded-lg text-white hover:bg-white/10" title="Retour au portail">
+                  <Home size={17} />
+                </a>
+                <UserMenu user={user} onLogout={() => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; }} isRealAdmin={isRealAdmin} viewAs={viewAs} setViewAs={setViewAs} />
+              </div>
+            </div>
+            <p className="text-xs mt-2 sm:hidden truncate col-span-3" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} — Nous fêtons les {getSaintDuJour()}
+            </p>
           </div>
         </div>
-      </header>
+        <div className="sm:hidden rounded-xl px-4 py-2.5 mb-4 shadow-sm text-center" style={{ background: '#F5EFEA' }}>
+          <p className="font-bold text-base truncate" style={{ color: '#4A2C2A' }}>{form.prenom} {form.nom}</p>
+          <p className="text-xs" style={{ color: '#8A6A5C' }}>Chambre {form.chambre}</p>
+        </div>
 
       <div className="max-w-5xl mx-auto px-4 pt-4 no-print">
         <div className="flex gap-1 overflow-x-auto bg-white rounded-xl p-1 shadow-sm border border-gray-100">
