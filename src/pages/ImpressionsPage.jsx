@@ -552,12 +552,12 @@ export default function ImpressionsPage() {
 <title>Synthèse cuisine — Arc-en-Ciel</title>
 <style>
   @page { size: A3 landscape; margin: 10mm; }
-  body { font-family: Arial, sans-serif; font-size: 8px; }
-  h2 { font-size: 13px; font-weight: bold; margin: 0 0 2px 0; }
-  h3 { font-size: 9px; font-weight: bold; margin: 10px 0 4px 0; color: #333; }
-  .meta { font-size: 8px; color: #555; margin-bottom: 8px; }
+  body { font-family: Arial, sans-serif; font-size: 9px; display: flex; flex-direction: column; justify-content: center; min-height: 95vh; }
+  h2 { font-size: 14px; font-weight: bold; margin: 0 0 2px 0; }
+  h3 { font-size: 10px; font-weight: bold; margin: 12px 0 5px 0; color: #333; }
+  .meta { font-size: 8px; color: #555; margin-bottom: 10px; }
   table { border-collapse: collapse; margin-bottom: 10px; }
-  th, td { border: 1px solid #ccc; padding: 2px 5px; text-align: left; font-size: 8px; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 8px; vertical-align: middle; }
   th { background: #f3f0eb; font-weight: bold; }
   td.num { text-align: center; }
   td.dr { text-align: center; color: #888; font-size: 7px; }
