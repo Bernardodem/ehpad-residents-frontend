@@ -109,10 +109,10 @@ function DetailProtectionsDoc({ residents }) {
 
 const DOCS = [
   { id: 'detail-prot', label: 'Détail protections par appartement', icon: '🩲', desc: '5 pages A4 — une par appartement' },
-  { id: 'dotation-prot', label: 'Dotation protections par appartement', icon: '📦', desc: 'Quantités jour / semaine / mois', disabled: true },
+  { id: 'dotation-prot', label: 'Dotation protections par appartement', icon: '📦', desc: 'Quantités jour / semaine / mois — filtres étage, appartement, slot' },
   { id: 'cuisine-a3', label: 'Tableau synthèse cuisine', icon: '🍽️', desc: 'Format A3 paysage — textures & régimes', disabled: true },
   { id: 'falc', label: 'Tableau alimentation FALC', icon: '🥣', desc: 'Simplifié pour les ASH', disabled: true },
-  { id: 'risques', label: 'Tableau des risques', icon: '⚠️', desc: 'Par résident et par type', disabled: true },
+  { id: 'risques', label: 'Tableau des risques', icon: '⚠️', desc: 'Par résident et par type de risque' },
   { id: 'contentions', label: 'Tableau des contentions', icon: '🔒', desc: 'Barrières, grenouillère, coquille, ceinture', disabled: true },
   { id: 'cartes-soignants', label: 'Cartes soignants', icon: '👩‍⚕️', desc: 'Pleine page ou 2/page, unitaire ou global', disabled: true },
 ];
@@ -130,7 +130,247 @@ export default function ImpressionsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const [filtreAppt, setFiltreAppt] = useState('');
+  const [filtreSlot, setFiltreSlot] = useState('tout');
+
   const handlePrint = (docId) => {
+    if (docId === 'dotation-prot') {
+      const today = new Date().toLocaleDateString('fr-FR');
+      const slotLabel = { tout: 'Jour + Nuit', jour: 'Jour (Matin, Après-midi, Soir)', nuit: 'Nuit' };
+
+      const apptLabel = (n) => {
+        if (n === 1) return 'Appartement 1 — Rez-de-chaussée';
+        if (n === 2) return 'Appartement 2 — 1er étage';
+        if (n === 3) return 'Appartement 3 — 1er étage';
+        if (n === 4) return 'Appartement 4 — 2ème étage';
+        if (n === 5) return 'Appartement 5 — 2ème étage';
+        return `Appartement ${n}`;
+      };
+
+      const slotsActifs = filtreSlot === 'jour'
+        ? ['prot_m', 'prot_am', 'prot_s']
+        : filtreSlot === 'nuit'
+        ? ['prot_n']
+        : ['prot_m', 'prot_am', 'prot_s', 'prot_n'];
+
+      const fmt = (type, taille, slot) => {
+        if (!type || type === 'Aucune' || type === '') return null;
+        const couleur = slot === 'prot_s' ? 'Vert' : 'Jaune';
+        if (type === 'Anaform' || type === 'Protection légère' || type === 'Pants') return type;
+        return `${type}${taille ? ' ' + taille : ''} ${couleur}`;
+      };
+
+      const apptsFiltres = filtreAppt
+        ? [parseInt(filtreAppt)]
+        : [1, 2, 3, 4, 5];
+
+      // Calcul des dotations par appt
+      const sections = apptsFiltres.map(appt => {
+        const list = residents.filter(r => Math.floor(r.chambre / 100) === appt);
+        // Compter par type de protection
+        const counts = {};
+        list.forEach(r => {
+          slotsActifs.forEach(s => {
+            const v = fmt(r[s], r.prot_taille, s);
+            if (v) counts[v] = (counts[v] || 0) + 1;
+          });
+        });
+        return { appt, counts, nbRes: list.length };
+      });
+
+      const totalGlobal = {};
+      sections.forEach(({ counts }) => {
+        Object.entries(counts).forEach(([k, v]) => {
+          totalGlobal[k] = (totalGlobal[k] || 0) + v;
+        });
+      });
+
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Dotation protections — Arc-en-Ciel</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  body { font-family: Arial, sans-serif; font-size: 9px; }
+  h2 { font-size: 13px; font-weight: bold; margin: 0 0 4px 0; }
+  h3 { font-size: 10px; margin: 10px 0 4px 0; color: #333; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+  .meta { font-size: 9px; color: #777; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 8px; }
+  th, td { border: 1px solid #ccc; padding: 3px 6px; text-align: left; }
+  th { background: #f3f0eb; font-weight: bold; }
+  td.num { text-align: center; }
+  .total-row td { background: #f3f0eb; font-weight: bold; }
+  .grand-total { margin-top: 12px; border-top: 2px solid #4A2C2A; padding-top: 8px; }
+  .note { font-size: 8px; color: #aaa; margin-top: 4px; font-style: italic; }
+  .doc-footer { font-size: 8px; color: #999; margin-top: 16px; text-align: right; }
+</style>
+</head><body>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+  <span>📦</span><h2>Dotation protections par appartement</h2>
+</div>
+<div class="meta">
+  Arc-en-Ciel EHPAD — ${today} — Slot : ${slotLabel[filtreSlot]}${filtreAppt ? ' — ' + apptLabel(parseInt(filtreAppt)) : ' — Tous les appartements'}
+</div>`;
+
+      sections.forEach(({ appt, counts, nbRes }) => {
+        const entries = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+        const totalJ = Object.values(counts).reduce((a, b) => a + b, 0);
+        html += `<h3>${apptLabel(appt)} — ${nbRes} résident(s)</h3>
+<table>
+  <thead><tr>
+    <th>Type de protection</th>
+    <th class="num">Unités/jour</th>
+    <th class="num">Unités/semaine</th>
+    <th class="num">Unités/mois</th>
+    <th class="num">Sachets/mois*</th>
+  </tr></thead>
+  <tbody>`;
+        entries.forEach(([type, qteJ]) => {
+          html += `<tr>
+    <td>${type}</td>
+    <td class="num">${qteJ}</td>
+    <td class="num">${qteJ * 7}</td>
+    <td class="num">${qteJ * 30}</td>
+    <td class="num">—</td>
+  </tr>`;
+        });
+        html += `<tr class="total-row">
+    <td>TOTAL</td>
+    <td class="num">${totalJ}</td>
+    <td class="num">${totalJ * 7}</td>
+    <td class="num">${totalJ * 30}</td>
+    <td class="num">—</td>
+  </tr></tbody></table>`;
+      });
+
+      if (apptsFiltres.length > 1) {
+        const entries = Object.entries(totalGlobal).sort((a, b) => a[0].localeCompare(b[0]));
+        const totalJ = Object.values(totalGlobal).reduce((a, b) => a + b, 0);
+        html += `<div class="grand-total">
+<h3 style="border-bottom:2px solid #4A2C2A;color:#4A2C2A">TOTAL ÉTABLISSEMENT</h3>
+<table>
+  <thead><tr>
+    <th>Type de protection</th>
+    <th class="num">Unités/jour</th>
+    <th class="num">Unités/semaine</th>
+    <th class="num">Unités/mois</th>
+    <th class="num">Sachets/mois*</th>
+  </tr></thead>
+  <tbody>`;
+        entries.forEach(([type, qteJ]) => {
+          html += `<tr>
+    <td>${type}</td>
+    <td class="num">${qteJ}</td>
+    <td class="num">${qteJ * 7}</td>
+    <td class="num">${qteJ * 30}</td>
+    <td class="num">—</td>
+  </tr>`;
+        });
+        html += `<tr class="total-row">
+    <td>TOTAL</td>
+    <td class="num">${totalJ}</td>
+    <td class="num">${totalJ * 7}</td>
+    <td class="num">${totalJ * 30}</td>
+    <td class="num">—</td>
+  </tr></tbody></table></div>`;
+      }
+
+      html += `<div class="note">* Colonne Sachets/mois disponible après mise à jour du champ conditionnement dans l'app Stocks</div>
+<div class="doc-footer">${today} — Dotation protections — Arc-en-Ciel</div>
+</body></html>`;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => { win.print(); };
+    }
+
+    if (docId === 'risques') {
+      const today = new Date().toLocaleDateString('fr-FR');
+      const ALL_RISQUES = [
+        { label: 'Fugue',                    emoji: '⚡' },
+        { label: 'Chute',                    emoji: '🤕' },
+        { label: 'Addiction',                emoji: '🚬' },
+        { label: 'Dénutrition',              emoji: '🥗' },
+        { label: 'Fausse route',             emoji: '🫁' },
+        { label: 'Sexualité',                emoji: '❤️' },
+        { label: 'Suicide',                  emoji: '🆘' },
+        { label: 'Harcèlement / Abus de faiblesse', emoji: '⚠️' },
+        { label: 'Radicalisation',           emoji: '🔴' },
+      ];
+
+      const list = [...residents].sort((a, b) => a.chambre - b.chambre);
+      const totaux = {};
+      ALL_RISQUES.forEach(r => { totaux[r.label] = 0; });
+      list.forEach(r => {
+        (r.risques || []).forEach(risk => { if (totaux[risk] !== undefined) totaux[risk]++; });
+      });
+
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Tableau des risques — Arc-en-Ciel</title>
+<style>
+  @page { size: A3 portrait; margin: 10mm; }
+  body { font-family: Arial, sans-serif; font-size: 7.5px; }
+  h2 { font-size: 12px; font-weight: bold; margin: 0 0 1px 0; }
+  .meta { font-size: 7px; color: #555; margin-bottom: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 7.5px; margin-bottom: 6px; }
+  th, td { border: 1px solid #ccc; padding: 1px 3px; }
+  th { background: #f3f0eb; font-weight: bold; text-align: left; }
+  th.risque { text-align: center; height: 22px; padding: 2px 4px; font-size: 7px; vertical-align: middle; white-space: nowrap; }
+  td.check { text-align: center; font-size: 9px; color: #c0392b; font-weight: bold; }
+  td.num { text-align: center; }
+  .total-row td { background: #f3f0eb; font-weight: bold; text-align: center; }
+  .total-row td:first-child { text-align: left; }
+  .sig-block { display: flex; gap: 10mm; margin-top: 5mm; }
+  .sig-box { flex: 1; border: 1px solid #ccc; border-radius: 4px; padding: 5px 8px; min-height: 18mm; }
+  .sig-title { font-size: 8px; font-weight: bold; color: #4A2C2A; margin-bottom: 4px; }
+  .sig-line { border-bottom: 1px solid #bbb; margin-bottom: 8px; padding-bottom: 1px; font-size: 6px; color: #999; }
+  .doc-footer { font-size: 6px; color: #999; margin-top: 4px; text-align: right; }
+</style>
+</head><body>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+  <span style="font-size:16px">⚠️</span><h2>Tableau des risques identifiés</h2>
+</div>
+<div class="meta">Arc-en-Ciel EHPAD · ${list.length} résidents · Mis à jour le ${today}</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:4%">Ch.</th>
+      <th style="width:13%">Résident</th>
+      ${ALL_RISQUES.map(r => `<th class="risque">${r.emoji}<br>${r.label.length > 8 ? r.label.substring(0,8)+'.' : r.label}</th>`).join('')}
+    </tr>
+  </thead>
+  <tbody>
+    ${list.map(r => `<tr>
+      <td>${r.chambre}</td>
+      <td>${r.nom}${r.prenom ? ' ' + r.prenom[0] + '.' : ''}</td>
+      ${ALL_RISQUES.map(risk => `<td class="check">${(r.risques||[]).includes(risk.label) ? '✓' : ''}</td>`).join('')}
+    </tr>`).join('')}
+    <tr class="total-row">
+      <td colspan="2">Total</td>
+      ${ALL_RISQUES.map(r => `<td>${totaux[r.label] || ''}</td>`).join('')}
+    </tr>
+  </tbody>
+</table>
+<div class="sig-block">
+  <div class="sig-box">
+    <div class="sig-title">Médecin coordonnateur</div>
+    <div class="sig-line">Nom &amp; Signature</div>
+    <div class="sig-line">Date</div>
+  </div>
+  <div class="sig-box">
+    <div class="sig-title">IDE coordinatrice</div>
+    <div class="sig-line">Nom &amp; Signature</div>
+    <div class="sig-line">Date</div>
+  </div>
+</div>
+<div class="doc-footer">${today} — Arc-en-Ciel — Tableau des risques</div>
+</body></html>`;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => { win.print(); };
+    }
+
     if (docId === 'detail-prot') {
       const slots = ['prot_m', 'prot_am', 'prot_s', 'prot_n'];
       const appts = [1, 2, 3, 4, 5];
@@ -268,23 +508,58 @@ export default function ImpressionsPage() {
         ) : (
           <div className="space-y-2">
             {DOCS.map(doc => (
-              <div key={doc.id} className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center justify-between gap-4 ${doc.disabled ? 'opacity-50' : ''}`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{doc.icon}</span>
-                  <div>
-                    <p className="font-semibold text-gray-900 text-sm">{doc.label}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{doc.desc}</p>
+              <div key={doc.id} className={`bg-white rounded-xl shadow-sm border border-gray-100 ${doc.disabled ? 'opacity-50' : ''}`}>
+                <div className="p-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{doc.icon}</span>
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">{doc.label}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{doc.desc}</p>
+                    </div>
                   </div>
+                  <button
+                    disabled={doc.disabled}
+                    onClick={() => handlePrint(doc.id)}
+                    className="px-4 py-2 rounded-xl text-white text-sm font-medium flex items-center gap-2 shrink-0 disabled:cursor-not-allowed"
+                    style={{ background: doc.disabled ? '#ccc' : '#4A2C2A' }}
+                  >
+                    <Printer size={14} />
+                    {doc.disabled ? 'Bientôt' : 'Imprimer'}
+                  </button>
                 </div>
-                <button
-                  disabled={doc.disabled}
-                  onClick={() => handlePrint(doc.id)}
-                  className="px-4 py-2 rounded-xl text-white text-sm font-medium flex items-center gap-2 shrink-0 disabled:cursor-not-allowed"
-                  style={{ background: doc.disabled ? '#ccc' : '#4A2C2A' }}
-                >
-                  <Printer size={14} />
-                  {doc.disabled ? 'Bientôt' : 'Imprimer'}
-                </button>
+                {doc.id === 'dotation-prot' && !doc.disabled && (
+                  <div className="px-4 pb-4 pt-3 flex flex-wrap gap-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500 shrink-0">Appt</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setFiltreAppt('')}
+                          className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                          style={{ background: filtreAppt === '' ? '#C9A84C' : '#4A2C2A', opacity: filtreAppt !== '' ? 0.35 : 1 }}
+                        >Tous</button>
+                        {[1,2,3,4,5].map(a => (
+                          <button key={a}
+                            onClick={() => setFiltreAppt(f => f === String(a) ? '' : String(a))}
+                            className="w-8 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                            style={{ background: filtreAppt === String(a) ? '#C9A84C' : '#4A2C2A', opacity: filtreAppt && filtreAppt !== String(a) ? 0.35 : 1 }}
+                          >{a}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500 shrink-0">Slot</span>
+                      <div className="flex gap-1">
+                        {[['tout','Jour + Nuit'],['jour','Jour'],['nuit','Nuit']].map(([val, label]) => (
+                          <button key={val}
+                            onClick={() => setFiltreSlot(val)}
+                            className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                            style={{ background: filtreSlot === val ? '#C9A84C' : '#4A2C2A', opacity: filtreSlot !== val ? 0.35 : 1 }}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
