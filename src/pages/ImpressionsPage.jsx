@@ -109,7 +109,7 @@ function DetailProtectionsDoc({ residents }) {
 
 const DOCS = [
   { id: 'detail-prot', label: 'Détail protections par appartement', icon: '🩲', desc: '5 pages A4 — une par appartement' },
-  { id: 'dotation-prot', label: 'Dotation protections par appartement', icon: '📦', desc: 'Quantités jour / semaine / mois — filtres étage, appartement, slot' },
+  { id: 'dotation-prot', label: 'Dotation protection', icon: '📦', desc: 'Quantités jour / semaine / mois — filtres étage, appartement, slot' },
   { id: 'cuisine-a3', label: 'Tableau synthèse cuisine', icon: '🍽️', desc: 'Format A3 paysage — textures & régimes', disabled: true },
   { id: 'falc', label: 'Tableau alimentation FALC', icon: '🥣', desc: 'Simplifié pour les ASH', disabled: true },
   { id: 'risques', label: 'Tableau des risques', icon: '⚠️', desc: 'Par résident et par type de risque' },
@@ -163,6 +163,10 @@ export default function ImpressionsPage() {
       const apptsFiltres = filtreAppt
         ? [parseInt(filtreAppt)]
         : [1, 2, 3, 4, 5];
+
+      // Même filtres pour detail-prot
+      const apptsFiltresDetail = apptsFiltres;
+      const slotsActifsDetail = slotsActifs;
 
       // Calcul des dotations par appt
       const sections = apptsFiltres.map(appt => {
@@ -470,8 +474,15 @@ export default function ImpressionsPage() {
     }
 
     if (docId === 'detail-prot') {
-      const slots = ['prot_m', 'prot_am', 'prot_s', 'prot_n'];
-      const appts = [1, 2, 3, 4, 5];
+      const slots = filtreSlot === 'jour'
+        ? ['prot_m', 'prot_am', 'prot_s']
+        : filtreSlot === 'nuit'
+        ? ['prot_n']
+        : ['prot_m', 'prot_am', 'prot_s', 'prot_n'];
+      const slotHeaders = {
+        prot_m: 'Matin', prot_am: 'Après-midi', prot_s: 'Soir', prot_n: 'Nuit'
+      };
+      const appts = filtreAppt ? [parseInt(filtreAppt)] : [1, 2, 3, 4, 5];
       const today = new Date().toLocaleDateString('fr-FR');
 
       const apptLabel = (n) => {
@@ -529,11 +540,8 @@ export default function ImpressionsPage() {
       <th style="width:5%">Ch.</th>
       <th style="width:14%">Nom</th>
       <th style="width:12%">Prénom</th>
-      <th style="width:17%">Matin</th>
-      <th style="width:17%">Après-midi</th>
-      <th style="width:17%">Soir</th>
-      <th style="width:12%">Nuit</th>
-      <th style="width:6%;text-align:center">Total/j</th>
+      ${slots.map(s => `<th>${slotHeaders[s]}</th>`).join('')}
+      <th style="text-align:center">Total/j</th>
     </tr></thead>
     <tbody>`;
 
@@ -625,6 +633,39 @@ export default function ImpressionsPage() {
                     {doc.disabled ? 'Bientôt' : 'Imprimer'}
                   </button>
                 </div>
+                {doc.id === 'detail-prot' && !doc.disabled && (
+                  <div className="px-4 pb-4 pt-3 flex flex-wrap gap-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500 shrink-0">Appt</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setFiltreAppt('')}
+                          className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                          style={{ background: filtreAppt === '' ? '#C9A84C' : '#4A2C2A', opacity: filtreAppt !== '' ? 0.35 : 1 }}
+                        >Tous</button>
+                        {[1,2,3,4,5].map(a => (
+                          <button key={a}
+                            onClick={() => setFiltreAppt(f => f === String(a) ? '' : String(a))}
+                            className="w-8 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                            style={{ background: filtreAppt === String(a) ? '#C9A84C' : '#4A2C2A', opacity: filtreAppt && filtreAppt !== String(a) ? 0.35 : 1 }}
+                          >{a}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500 shrink-0">Slot</span>
+                      <div className="flex gap-1">
+                        {[['tout','Jour + Nuit'],['jour','Jour'],['nuit','Nuit']].map(([val, label]) => (
+                          <button key={val}
+                            onClick={() => setFiltreSlot(val)}
+                            className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                            style={{ background: filtreSlot === val ? '#C9A84C' : '#4A2C2A', opacity: filtreSlot !== val ? 0.35 : 1 }}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {doc.id === 'dotation-prot' && !doc.disabled && (
                   <div className="px-4 pb-4 pt-3 flex flex-wrap gap-4 border-t border-gray-100">
                     <div className="flex items-center gap-2">
