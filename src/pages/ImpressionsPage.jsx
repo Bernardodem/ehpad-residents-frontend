@@ -110,7 +110,7 @@ function DetailProtectionsDoc({ residents }) {
 const DOCS = [
   { id: 'detail-prot', label: 'Détail protections par appartement', icon: '🩲', desc: '5 pages A4 — une par appartement' },
   { id: 'dotation-prot', label: 'Dotation protection', icon: '📦', desc: 'Quantités jour / semaine / mois — filtres étage, appartement, slot' },
-  { id: 'cuisine-a3', label: 'Tableau synthèse cuisine', icon: '🍽️', desc: 'Format A3 paysage — textures & régimes', disabled: true },
+  { id: 'cuisine-a3', label: 'Tableau synthèse cuisine', icon: '🍽️', desc: 'Format A3 paysage — textures & régimes' },
   { id: 'falc', label: 'Tableau alimentation FALC', icon: '🥣', desc: 'Simplifié pour les ASH', disabled: true },
   { id: 'risques', label: 'Tableau des risques', icon: '⚠️', desc: 'Par résident et par type de risque' },
   { id: 'contentions', label: 'Tableau des contentions', icon: '🔒', desc: 'Barrières, grenouillère, coquille, ceinture — A3 portrait' },
@@ -465,6 +465,192 @@ export default function ImpressionsPage() {
   </div>
 </div>
 <div class="doc-footer">${today} — Arc-en-Ciel — Tableau des contentions</div>
+</body></html>`;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => { win.print(); };
+    }
+
+    if (docId === 'cuisine-a3') {
+      const today = new Date().toLocaleDateString('fr-FR');
+
+      const TEXTURES = ['NORMALE', 'HACHEE', 'MIXEE'];
+      const TEXTURE_LABEL = { NORMALE: 'Normale', HACHEE: 'Hachée', MIXEE: 'Mixée' };
+      const TEXTURE_COLOR = { NORMALE: '#27ae60', HACHEE: '#f39c12', MIXEE: '#2980b9' };
+
+      const APPT_GROUPS = [
+        { label: 'RDC (Apt 1)',          appts: [1] },
+        { label: '1er étage (Apt 2 & 3)', appts: [2, 3] },
+        { label: '2ème étage (Apt 4 & 5)', appts: [4, 5] },
+      ];
+
+      const list = residents.filter(r => !r.archive);
+
+      const getEtageGroup = (chambre) => {
+        const appt = Math.floor(chambre / 100);
+        return APPT_GROUPS.find(g => g.appts.includes(appt));
+      };
+
+      // Section 1 : synthèse par texture et étage
+      const synthese = APPT_GROUPS.map(g => {
+        const rg = list.filter(r => g.appts.includes(Math.floor(r.chambre / 100)));
+        const row = { label: g.label, total: rg.length };
+        TEXTURES.forEach(t => {
+          const sub = rg.filter(r => r.texture === t);
+          row[t] = sub.length;
+          row[t + '_dr'] = sub.filter(r => (r.cno || []).includes('Double ration')).length;
+        });
+        return row;
+      });
+      const totSynth = { total: list.length };
+      TEXTURES.forEach(t => {
+        totSynth[t] = list.filter(r => r.texture === t).length;
+        totSynth[t + '_dr'] = list.filter(r => r.texture === t && (r.cno || []).includes('Double ration')).length;
+      });
+
+      // Section 2 : combinaisons exactes
+      const getCombKey = (r) => {
+        const t = TEXTURE_LABEL[r.texture] || r.texture;
+        const regs = (r.regimes || []).slice().sort().join('+');
+        return regs ? `${t}+${regs}` : `${t} standard`;
+      };
+
+      // Collecter toutes les combinaisons uniques
+      const allCombs = {};
+      list.forEach(r => {
+        const key = getCombKey(r);
+        if (!allCombs[key]) allCombs[key] = { texture: r.texture, regimes: (r.regimes || []).slice().sort(), count: {} };
+        APPT_GROUPS.forEach(g => { allCombs[key].count[g.label] = allCombs[key].count[g.label] || 0; });
+      });
+      list.forEach(r => {
+        const key = getCombKey(r);
+        const g = getEtageGroup(r.chambre);
+        if (g) allCombs[key].count[g.label]++;
+      });
+
+      // Trier : par texture puis standard en premier
+      const combKeys = Object.keys(allCombs).sort((a, b) => {
+        const ta = allCombs[a].texture, tb = allCombs[b].texture;
+        if (ta !== tb) return TEXTURES.indexOf(ta) - TEXTURES.indexOf(tb);
+        const stdA = a.includes('standard') ? 0 : 1;
+        const stdB = b.includes('standard') ? 0 : 1;
+        return stdA - stdB;
+      });
+
+      // Double ration colonne séparée
+      const drKey = 'Double ration';
+      const drByGroup = {};
+      APPT_GROUPS.forEach(g => {
+        drByGroup[g.label] = list.filter(r =>
+          g.appts.includes(Math.floor(r.chambre / 100)) && (r.cno || []).includes('Double ration')
+        ).length;
+      });
+
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Synthèse cuisine — Arc-en-Ciel</title>
+<style>
+  @page { size: A3 landscape; margin: 10mm; }
+  body { font-family: Arial, sans-serif; font-size: 8px; }
+  h2 { font-size: 13px; font-weight: bold; margin: 0 0 2px 0; }
+  h3 { font-size: 9px; font-weight: bold; margin: 10px 0 4px 0; color: #333; }
+  .meta { font-size: 8px; color: #555; margin-bottom: 8px; }
+  table { border-collapse: collapse; margin-bottom: 10px; }
+  th, td { border: 1px solid #ccc; padding: 2px 5px; text-align: left; font-size: 8px; }
+  th { background: #f3f0eb; font-weight: bold; }
+  td.num { text-align: center; }
+  td.dr { text-align: center; color: #888; font-size: 7px; }
+  .total-row td { background: #f3f0eb; font-weight: bold; }
+  .total-row td:not(:first-child) { text-align: center; }
+  .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; color: white; font-size: 7px; font-weight: bold; margin-right: 2px; }
+  .legend { display: flex; gap: 12px; margin-bottom: 6px; font-size: 7px; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .doc-footer { font-size: 7px; color: #999; margin-top: 8px; text-align: right; }
+  .note { font-size: 7px; color: #888; font-style: italic; margin-top: 4px; }
+</style>
+</head><body>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+  <span style="font-size:16px">📊</span><h2>Récapitulatif Cuisine — Synthèse A3</h2>
+</div>
+<div class="meta">Arc-en-Ciel EHPAD — Mis à jour le ${today} — Format A3 paysage</div>
+
+<h3>📊 Synthèse par texture et étage</h3>
+<table style="width:100%">
+  <thead><tr>
+    <th>Étage</th>
+    <th style="color:${TEXTURE_COLOR.NORMALE}">🟢 Normale</th>
+    <th style="color:#aaa;font-size:7px">dont double ration</th>
+    <th style="color:${TEXTURE_COLOR.HACHEE}">🟡 Hachée</th>
+    <th style="color:#aaa;font-size:7px">dont double ration</th>
+    <th style="color:${TEXTURE_COLOR.MIXEE}">🔵 Mixée</th>
+    <th style="color:#aaa;font-size:7px">dont double ration</th>
+    <th>TOTAL repas</th>
+  </tr></thead>
+  <tbody>
+    ${synthese.map(row => `<tr>
+      <td>${row.label}</td>
+      <td class="num">${row.NORMALE || '—'}</td>
+      <td class="dr">${row.NORMALE_dr || '—'}</td>
+      <td class="num">${row.HACHEE || '—'}</td>
+      <td class="dr">${row.HACHEE_dr || '—'}</td>
+      <td class="num">${row.MIXEE || '—'}</td>
+      <td class="dr">${row.MIXEE_dr || '—'}</td>
+      <td class="num">${row.total}</td>
+    </tr>`).join('')}
+    <tr class="total-row">
+      <td>TOTAL ÉTABLISSEMENT</td>
+      <td>${totSynth.NORMALE}</td>
+      <td class="dr">${totSynth.NORMALE_dr || '—'}</td>
+      <td>${totSynth.HACHEE}</td>
+      <td class="dr">${totSynth.HACHEE_dr || '—'}</td>
+      <td>${totSynth.MIXEE}</td>
+      <td class="dr">${totSynth.MIXEE_dr || '—'}</td>
+      <td>${totSynth.total}</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>🍽 Détail par combinaison exacte — chaque résident compté une seule fois dans sa combinaison texture + régimes</h3>
+<table style="width:100%">
+  <thead><tr>
+    <th>Étage</th>
+    ${combKeys.map(k => {
+      const c = allCombs[k];
+      const color = TEXTURE_COLOR[c.texture] || '#666';
+      const label = k.replace('standard','').replace(/\+/g,' +').trim() || 'standard';
+      return `<th style="font-size:7px;text-align:center;color:${color}">${label}</th>`;
+    }).join('')}
+    <th style="font-size:7px;text-align:center;color:#888">Double ration</th>
+    <th style="text-align:center">TOTAL repas</th>
+  </tr></thead>
+  <tbody>
+    ${APPT_GROUPS.map(g => {
+      const rowTotal = list.filter(r => g.appts.includes(Math.floor(r.chambre / 100))).length;
+      return `<tr>
+      <td>${g.label}</td>
+      ${combKeys.map(k => `<td class="num">${allCombs[k].count[g.label] || '—'}</td>`).join('')}
+      <td class="num">${drByGroup[g.label] || '—'}</td>
+      <td class="num">${rowTotal}</td>
+    </tr>`;
+    }).join('')}
+    <tr class="total-row">
+      <td>TOTAL ÉTABLISSEMENT</td>
+      ${combKeys.map(k => `<td>${Object.values(allCombs[k].count).reduce((a,b)=>a+b,0) || '—'}</td>`).join('')}
+      <td>${Object.values(drByGroup).reduce((a,b)=>a+b,0) || '—'}</td>
+      <td>${list.length}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:${TEXTURE_COLOR.NORMALE}"></div> Normale</div>
+  <div class="legend-item"><div class="legend-dot" style="background:${TEXTURE_COLOR.HACHEE}"></div> Hachée</div>
+  <div class="legend-item"><div class="legend-dot" style="background:${TEXTURE_COLOR.MIXEE}"></div> Mixée</div>
+  <span style="margin-left:8px">· "standard" = aucun régime particulier · "Double ration" est un modificateur de quantité comptabilisé séparément dans le tableau 1</span>
+</div>
+<div class="doc-footer">${today} — Arc-en-Ciel — Tableau repas cuisine</div>
 </body></html>`;
 
       const win = window.open('', '_blank');
