@@ -228,7 +228,9 @@ export default function RepartitionPage() {
       <div className="max-w-5xl w-full mx-auto px-4 mb-4 space-y-3">
         <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
           <a href="/residents" className="flex-1 py-2 px-3 rounded-lg text-sm font-medium text-center text-gray-500 hover:text-gray-700 no-underline">Résidents</a>
-          <span className="flex-1 py-2 px-3 rounded-lg text-sm font-medium text-center text-white" style={{ background: '#4A2C2A' }}>Répartition</span>
+          <a href="/residents/repartition" className="flex-1 py-2 px-3 rounded-lg text-sm font-medium text-center text-white no-underline" style={{ background: '#4A2C2A' }}>Répartition</a>
+          <a href="/residents/impressions" className="flex-1 py-2 px-3 rounded-lg text-sm font-medium text-center text-gray-500 hover:text-gray-700 no-underline">Impressions</a>
+
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {configs.map(c => (

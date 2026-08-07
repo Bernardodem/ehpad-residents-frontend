@@ -114,7 +114,7 @@ const DOCS = [
   { id: 'falc', label: 'Tableau alimentation FALC', icon: '🥣', desc: 'Une page par appartement — texture, lieux, aide repas, PDJ, notes', hasApptFilter: true },
   { id: 'risques', label: 'Tableau des risques', icon: '⚠️', desc: 'Par résident et par type de risque' },
   { id: 'contentions', label: 'Tableau des contentions', icon: '🔒', desc: 'Barrières, grenouillère, coquille, ceinture — A3 portrait' },
-  { id: 'cartes-soignants', label: 'Cartes soignants', icon: '👩‍⚕️', desc: 'Pleine page ou 2/page, unitaire ou global', disabled: true },
+  { id: 'cartes-soignants', label: 'Cartes résidents', icon: '👩‍⚕️', desc: '2 par page A4 paysage — filtre par soignant ou étage/appartement', hasCarteFilter: true },
 ];
 
 export default function ImpressionsPage() {
@@ -128,7 +128,28 @@ export default function ImpressionsPage() {
       .then(({ data }) => setResidents(data))
       .catch(() => toast.error('Erreur de chargement'))
       .finally(() => setLoading(false));
+    api.get('/repartition/configs')
+      .then(async ({ data }) => {
+        const details = await Promise.all(
+          data.map(c => api.get(`/repartition/configs/${c.id}`).then(r => r.data).catch(() => c))
+        );
+        setCarteConfigs(details);
+      })
+      .catch(() => {});
   }, []);
+
+  const loadCarteSoignants = (configId) => {
+    setCarteConfigId(configId);
+    setCarteSoignants([]);
+    setCarteSelectedSoignants([]);
+    if (!configId) return;
+    api.get(`/repartition/configs/${configId}`)
+      .then(({ data }) => {
+        setCarteSoignants(data.soignants || []);
+        setCarteSelectedSoignants((data.soignants || []).map(s => s.id));
+      })
+      .catch(() => toast.error('Erreur chargement soignants'));
+  };
 
   const [filtreApptDetail, setFiltreApptDetail] = useState('');
   const [filtreSlotDetail, setFiltreSlotDetail] = useState('tout');
@@ -136,6 +157,12 @@ export default function ImpressionsPage() {
   const [filtreSlotDotation, setFiltreSlotDotation] = useState('tout');
   const [filtreApptFalc, setFiltreApptFalc] = useState('');
   const [filtreEtageFalc, setFiltreEtageFalc] = useState('');
+  const [carteConfigs, setCarteConfigs] = useState([]);
+  const [carteConfigId, setCarteConfigId] = useState('');
+  const [carteSoignants, setCarteSoignants] = useState([]);
+  const [carteSelectedSoignants, setCarteSelectedSoignants] = useState([]);
+  const [carteAppt, setCarteAppt] = useState('');
+  const [carteEtage, setCarteEtage] = useState('');
 
   const handlePrint = (docId) => {
     if (docId === 'dotation-prot') {
@@ -799,6 +826,365 @@ export default function ImpressionsPage() {
       win.onload = () => { win.print(); };
     }
 
+    if (docId === 'cartes-soignants') {
+      const today = new Date().toLocaleDateString('fr-FR');
+      const TEXTURE_EMOJI = { NORMALE: '🟢', HACHEE: '🟡', MIXEE: '🔵' };
+      const TEXTURE_LABEL = { NORMALE: 'Normale', HACHEE: 'Hachée', MIXEE: 'Mixée' };
+      const PDJ_EMOJI = {
+        'Café': '☕', 'Café au lait': '☕', 'Thé': '🍵', 'Lait': '🥛',
+        'Chocolat au lait': '🍫', "Jus d'orange": '🍊', 'Jus de pomme': '🍏',
+        'Baguette': '🥖', 'Pain de mie': '🍞', 'Beurre': '🧈', 'Confiture': '🍓',
+        'Blédine': '🫙',
+      };
+
+      const lieuIcon = (lieu) => {
+        if (!lieu) return '🍽';
+        if (lieu === 'Chambre') return '🛏';
+        return '🍽';
+      };
+
+      const apptLabel = (chambre) => {
+        const a = Math.floor(chambre / 100);
+        if (a === 1) return 'RDC · Apt 1';
+        if (a === 2) return '1er · Apt 2';
+        if (a === 3) return '1er · Apt 3';
+        if (a === 4) return '2ème · Apt 4';
+        if (a === 5) return '2ème · Apt 5';
+        return '';
+      };
+
+      // Déterminer les résidents à imprimer
+      let residentsToPrint = [];
+
+      if (carteConfigId && carteSoignants.length > 0 && carteSelectedSoignants.length > 0) {
+        // Mode répartition : on prend les résidents des soignants sélectionnés
+        const selectedSoignantData = carteSoignants.filter(s => carteSelectedSoignants.includes(s.id));
+        const chambres = selectedSoignantData.flatMap(s => s.chambres_default || []);
+        residentsToPrint = residents
+          .filter(r => chambres.includes(r.chambre))
+          .sort((a, b) => a.chambre - b.chambre);
+      } else {
+        // Mode étage/appt
+        residentsToPrint = residents.filter(r => {
+          const a = Math.floor(r.chambre / 100);
+          if (carteAppt) return a === parseInt(carteAppt);
+          if (carteEtage === 'rdc') return a === 1;
+          if (carteEtage === '1er') return a === 2 || a === 3;
+          if (carteEtage === '2eme') return a === 4 || a === 5;
+          return true;
+        }).sort((a, b) => a.chambre - b.chambre);
+      }
+
+      // Vérifier résidents non affectés
+      {
+        let nonAffectes = [];
+        if (carteConfigId && carteSoignants.length > 0) {
+          const chambresAffectees = carteSoignants.flatMap(s => s.chambres_default || []);
+          nonAffectes = residents.filter(r => !chambresAffectees.includes(r.chambre));
+        } else {
+          console.log('carteConfigs:', JSON.stringify(carteConfigs.map(c => ({nom: c.nom, soignants: (c.soignants||[]).map(s => ({label: s.label, chambres: s.chambres_default}))}))));
+          const allChambresAffectees = new Set(
+            carteConfigs.flatMap(c => (c.soignants || []).flatMap(s => s.chambres_default || []))
+          );
+          console.log('allChambresAffectees:', [...allChambresAffectees]);
+          console.log('residentsToPrint:', residentsToPrint.map(r => r.chambre));
+          nonAffectes = residentsToPrint.filter(r => !allChambresAffectees.has(r.chambre));
+          console.log('nonAffectes:', nonAffectes.map(r => r.chambre));
+        }
+        if (nonAffectes.length > 0) {
+          const noms = nonAffectes.map(r => `Ch. ${r.chambre} — ${r.nom} ${r.prenom || ''}`).join('\n');
+          const choix = window.confirm(
+            `⚠️ ${nonAffectes.length} résident(s) sans répartition configurée :\n\n${noms}\n\nContinuer l'impression quand même ?\n(Annuler = aller à la répartition)`
+          );
+          if (!choix) { window.location.href = '/residents/repartition'; return; }
+        }
+      }
+
+      // Générer les paires (2 par page)
+      const pairs = [];
+      for (let i = 0; i < residentsToPrint.length; i += 2) {
+        pairs.push([residentsToPrint[i], residentsToPrint[i+1] || null]);
+      }
+
+      const renderCarte = (r, soignantLabel) => {
+        if (!r) return '<div style="flex:1;border:2px solid #eee;border-radius:8px;"></div>';
+        const texture = r.texture || 'NORMALE';
+        const regimes = (r.regimes || []);
+        const cno = (r.cno || []);
+        const pdj = (r.pdj || []);
+        const aideRepas = r.aide_repas || 'Autonome';
+        const risques = (r.risques || []);
+        const prots = [
+          { label: 'Matin', val: r.prot_m }, { label: 'AM', val: r.prot_am },
+          { label: 'Soir', val: r.prot_s }, { label: 'Nuit', val: r.prot_n },
+        ].filter(p => p.val && p.val !== 'Aucune');
+        const hasProtheses = r.prot_dent || r.prot_aud || r.lunettes;
+
+        const lieuLabel = (lieu) => {
+          if (!lieu) return '—';
+          if (lieu === 'Chambre') return 'Chambre';
+          if (lieu === 'Salle') return 'Restaurant';
+          return lieu;
+        };
+
+        const textureBg = texture === 'NORMALE' ? '#27ae60' : texture === 'HACHEE' ? '#f39c12' : '#2980b9';
+
+        return `<div style="flex:1;border:2px solid #3A6B4A;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-height:0;">
+  <div style="background:linear-gradient(135deg,#2d5a3d,#3A6B4A);color:white;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+    <span style="font-size:26px;font-weight:bold;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:6px;min-width:50px;text-align:center">${r.chambre}</span>
+    <div>
+      <div style="font-size:17px;font-weight:bold;letter-spacing:0.3px">${r.nom} ${r.prenom || ''}</div>
+      <div style="font-size:12px;opacity:0.85;margin-top:2px">${apptLabel(r.chambre)}${soignantLabel ? ' · ' + soignantLabel : ''}</div>
+    </div>
+  </div>
+  <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:12px;flex:1;overflow:hidden;">
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+
+      <div>
+        <div style="font-size:11px;font-weight:bold;color:#2d5a3d;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;margin-bottom:6px;">🧼 Nursing</div>
+        <div style="line-height:1.8">
+          <span style="color:#777;font-size:11px">Toilette : </span>${r.toilette || '—'}<br>
+          <span style="color:#777;font-size:11px">Déplacement : </span>${r.mode_depl || r.deplacement || '—'}
+        </div>
+      </div>
+
+      ${prots.length ? `<div>
+        <div style="font-size:11px;font-weight:bold;color:#2d5a3d;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;margin-bottom:6px;">🩺 Protections</div>
+        <div style="line-height:1.8">${prots.map(p => `<span style="color:#777;font-size:11px">${p.label} : </span>${p.val}${r.prot_taille ? ' ' + r.prot_taille : ''}<br>`).join('')}</div>
+      </div>` : ''}
+
+      ${hasProtheses ? `<div>
+        <div style="font-size:11px;font-weight:bold;color:#2d5a3d;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;margin-bottom:6px;">🦷 Prothèses</div>
+        <div style="line-height:1.8">${r.prot_dent ? '🦷 Dentier<br>' : ''}${r.prot_aud ? '👂 Auditif<br>' : ''}${r.lunettes ? '👓 Lunettes' : ''}</div>
+      </div>` : ''}
+
+      ${risques.length ? `<div>
+        <div style="font-size:11px;font-weight:bold;color:#c0392b;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #fdd;padding-bottom:3px;margin-bottom:6px;">⚠️ Risques</div>
+        <div style="line-height:1.8;color:#c0392b">${risques.map(r => '• ' + r).join('<br>')}</div>
+      </div>` : ''}
+
+      ${r.partic_soins || r.allergie ? `<div>
+        <div style="font-size:11px;font-weight:bold;color:#2d5a3d;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;margin-bottom:6px;">ℹ️ Particularités</div>
+        <div style="line-height:1.8;color:#555;font-style:italic">${r.partic_soins || ''}${r.allergie ? '<br>' + r.allergie : ''}</div>
+      </div>` : ''}
+
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+
+      <div>
+        <div style="font-size:11px;font-weight:bold;color:#2d5a3d;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;margin-bottom:6px;">🍽 Alimentation</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+          <span style="background:${textureBg};color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:bold">${TEXTURE_EMOJI[texture]} ${TEXTURE_LABEL[texture]}</span>
+          <span style="background:#eee;padding:3px 10px;border-radius:12px;font-size:11px">🥄 ${aideRepas}</span>
+        </div>
+        ${r.hydratation ? `<div style="margin-bottom:4px">💧 ${r.hydratation}</div>` : ''}
+        <div style="line-height:2;font-size:11px">
+          <span style="color:#777">Petit déjeuner : </span>${lieuLabel(r.lieu_pd)}<br>
+          <span style="color:#777">Déjeuner : </span>${lieuLabel(r.lieu_dj)}<br>
+          <span style="color:#777">Dîner : </span>${lieuLabel(r.lieu_d)}
+        </div>
+        ${regimes.length || cno.length ? `<div style="color:#c0392b;margin-top:6px;line-height:1.8">${[...regimes,...cno].map(x => '🚫 ' + x).join('<br>')}</div>` : ''}
+      </div>
+
+      ${pdj.length ? `<div>
+        <div style="font-size:11px;font-weight:bold;color:#2d5a3d;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;margin-bottom:6px;">☀️ Petit déjeuner</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">${pdj.map(p => `<span style="background:#f9f6f0;border:1px solid #ddd;border-radius:6px;padding:4px 8px;font-size:11px">${PDJ_EMOJI[p] || ''} ${p}</span>`).join('')}</div>
+      </div>` : ''}
+
+      ${r.partic_rep ? `<div>
+        <div style="font-size:11px;font-weight:bold;color:#2d5a3d;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;margin-bottom:6px;">📝 Notes repas</div>
+        <div style="color:#555;font-style:italic;line-height:1.6">${r.partic_rep}</div>
+      </div>` : ''}
+
+    </div>
+  </div>
+</div>`;
+      };
+
+      // Trouver le label soignant pour chaque résident
+      const getSoignantLabel = (r) => {
+        if (!carteSoignants.length) return '';
+        for (const s of carteSoignants) {
+          if ((s.chambres_default || []).includes(r.chambre)) return s.label;
+        }
+        return '';
+      };
+
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Cartes soignants — Arc-en-Ciel</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  body { font-family: Arial, sans-serif; margin: 0; font-size: 11px; }
+  .page { display: flex; gap: 12px; height: calc(100vh - 20mm); page-break-after: always; }
+  .page:last-child { page-break-after: avoid; }
+  .header-bar { font-size: 9px; color: #999; display: flex; justify-content: space-between; margin-bottom: 5px; }
+</style>
+</head><body>`;
+
+      pairs.forEach(([r1, r2]) => {
+        const sl1 = getSoignantLabel(r1);
+        const sl2 = r2 ? getSoignantLabel(r2) : '';
+        html += `<div class="header-bar"><span>🌈 Arc-en-Ciel${carteConfigId ? ' — ' + (carteConfigs.find(c => c.id === carteConfigId)?.nom || '') : ''}</span><span>${today}</span></div>
+<div class="page">
+  ${renderCarte(r1, sl1)}
+  ${renderCarte(r2, sl2)}
+</div>`;
+      });
+
+      html += '</body></html>';
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => { win.print(); };
+    }
+
+    if (docId === 'cartes-soignants') {
+      const today = new Date().toLocaleDateString('fr-FR');
+      const TEXTURE_EMOJI = { NORMALE: '🟢', HACHEE: '🟡', MIXEE: '🔵' };
+      const TEXTURE_LABEL = { NORMALE: 'Normale', HACHEE: 'Hachée', MIXEE: 'Mixée' };
+      const PDJ_EMOJI = {
+        'Café': '☕', 'Café au lait': '☕', 'Thé': '🍵', 'Lait': '🥛',
+        'Chocolat au lait': '🍫', "Jus d'orange": '🍊', 'Jus de pomme': '🍏',
+        'Baguette': '🥖', 'Pain de mie': '🍞', 'Beurre': '🧈', 'Confiture': '🍓',
+        'Blédine': '🫙',
+      };
+
+      const lieuIcon = (lieu) => {
+        if (!lieu) return '🍽';
+        if (lieu === 'Chambre') return '🛏';
+        return '🍽';
+      };
+
+      const apptLabel = (chambre) => {
+        const a = Math.floor(chambre / 100);
+        if (a === 1) return 'RDC · Apt 1';
+        if (a === 2) return '1er · Apt 2';
+        if (a === 3) return '1er · Apt 3';
+        if (a === 4) return '2ème · Apt 4';
+        if (a === 5) return '2ème · Apt 5';
+        return '';
+      };
+
+      // Déterminer les résidents à imprimer
+      let residentsToPrint = [];
+
+      if (carteConfigId && carteSoignants.length > 0 && carteSelectedSoignants.length > 0) {
+        // Mode répartition : on prend les résidents des soignants sélectionnés
+        const selectedSoignantData = carteSoignants.filter(s => carteSelectedSoignants.includes(s.id));
+        const chambres = selectedSoignantData.flatMap(s => s.chambres_default || []);
+        residentsToPrint = residents
+          .filter(r => chambres.includes(r.chambre))
+          .sort((a, b) => a.chambre - b.chambre);
+      } else {
+        // Mode étage/appt
+        residentsToPrint = residents.filter(r => {
+          const a = Math.floor(r.chambre / 100);
+          if (carteAppt) return a === parseInt(carteAppt);
+          if (carteEtage === 'rdc') return a === 1;
+          if (carteEtage === '1er') return a === 2 || a === 3;
+          if (carteEtage === '2eme') return a === 4 || a === 5;
+          return true;
+        }).sort((a, b) => a.chambre - b.chambre);
+      }
+
+      // Générer les paires (2 par page)
+      const pairs = [];
+      for (let i = 0; i < residentsToPrint.length; i += 2) {
+        pairs.push([residentsToPrint[i], residentsToPrint[i+1] || null]);
+      }
+
+      const renderCarte = (r, soignantLabel) => {
+        if (!r) return '<div style="flex:1"></div>';
+        const texture = r.texture || 'NORMALE';
+        const regimes = (r.regimes || []);
+        const cno = (r.cno || []);
+        const pdj = (r.pdj || []);
+        const aideRepas = r.aide_repas || 'Autonome';
+        const prots = [
+          r.prot_m ? `Matin : ${r.prot_m}` : null,
+          r.prot_am ? `AM : ${r.prot_am}` : null,
+          r.prot_s ? `Soir : ${r.prot_s}` : null,
+          r.prot_n ? `Nuit : ${r.prot_n}` : null,
+        ].filter(Boolean);
+        const hasProt = prots.some(p => !p.includes('Aucune') && !p.includes('undefined'));
+        const hasProtheses = r.prot_dent || r.prot_aud || r.lunettes;
+
+        return `<div style="flex:1;border:2px solid #3A6B4A;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;">
+  <div style="background:linear-gradient(135deg,#2d5a3d,#3A6B4A);color:white;padding:8px 12px;display:flex;align-items:center;gap:10px;">
+    <span style="font-size:22px;font-weight:bold;background:rgba(255,255,255,0.2);padding:3px 10px;border-radius:4px">${r.chambre}</span>
+    <div>
+      <div style="font-size:15px;font-weight:bold">${r.nom} ${r.prenom || ''}</div>
+      <div style="font-size:11px;opacity:0.8">${apptLabel(r.chambre)}${soignantLabel ? ' · ' + soignantLabel : ''}</div>
+    </div>
+  </div>
+  <div style="padding:10px;display:flex;gap:10px;font-size:11px;flex:1;">
+    <div style="flex:1;border-right:1px solid #eee;padding-right:8px;">
+      <div style="font-size:10px;font-weight:bold;color:#555;margin-bottom:6px;">🧼 NURSING</div>
+      <div>Lieu : ${r.toilette || '—'}</div>
+      <div>Mode dépl. : ${r.mode_depl || r.deplacement || '—'}</div>
+      ${hasProt ? `<div style="margin-top:8px;font-size:10px;font-weight:bold;color:#555;">🩺 PROTECTIONS</div>${prots.map(p => `<div>${p}${r.prot_taille ? ' ' + r.prot_taille : ''}</div>`).join('')}` : ''}
+      ${hasProtheses ? `<div style="margin-top:8px;font-size:10px;font-weight:bold;color:#555;">🦷 PROTHÈSES</div>${r.prot_dent ? '<div>🦷 Dentier</div>' : ''}${r.prot_aud ? '<div>👂 Auditif</div>' : ''}${r.lunettes ? '<div>👓 Lunettes</div>' : ''}` : ''}
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:10px;font-weight:bold;color:#555;margin-bottom:6px;">🍽 ALIMENTATION</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px;">
+        <span style="background:${texture === 'NORMALE' ? '#27ae60' : texture === 'HACHEE' ? '#f39c12' : '#2980b9'};color:white;padding:2px 8px;border-radius:10px;font-size:10px">${TEXTURE_EMOJI[texture]} ${TEXTURE_LABEL[texture]}</span>
+        <span style="background:#eee;padding:2px 8px;border-radius:10px;font-size:10px">🥄 ${aideRepas}</span>
+      </div>
+      ${r.hydratation ? `<div>💧 ${r.hydratation}</div>` : ''}
+      <div style="display:flex;gap:6px;margin:4px 0;">
+        <span style="text-align:center;font-size:8px">${lieuIcon(r.lieu_pd)}<br><span style="font-size:7px;color:#888">PD</span></span>
+        <span style="text-align:center;font-size:8px">${lieuIcon(r.lieu_dj)}<br><span style="font-size:7px;color:#888">DJ</span></span>
+        <span style="text-align:center;font-size:8px">${lieuIcon(r.lieu_d)}<br><span style="font-size:7px;color:#888">DÎNER</span></span>
+      </div>
+      ${regimes.length || cno.length ? `<div style="color:#c0392b;font-size:10px">${[...regimes,...cno].map(x => '🚫 ' + x).join(' ')}</div>` : ''}
+      ${pdj.length ? `<div style="margin-top:6px;font-size:10px;font-weight:bold;color:#555;">☀️ PETIT DÉJEUNER</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;">${pdj.map(p => `<span style="background:#f9f6f0;border:1px solid #ddd;border-radius:4px;padding:3px 7px;font-size:10px">${PDJ_EMOJI[p] || ''} ${p}</span>`).join('')}</div>` : ''}
+      ${r.allergie || r.partic_rep ? `<div style="margin-top:6px;font-size:10px;color:#777;font-style:italic">${r.allergie || ''} ${r.partic_rep || ''}</div>` : ''}
+    </div>
+  </div>
+</div>`;
+      };
+
+      // Trouver le label soignant pour chaque résident
+      const getSoignantLabel = (r) => {
+        if (!carteSoignants.length) return '';
+        for (const s of carteSoignants) {
+          if ((s.chambres_default || []).includes(r.chambre)) return s.label;
+        }
+        return '';
+      };
+
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Cartes soignants — Arc-en-Ciel</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  body { font-family: Arial, sans-serif; margin: 0; }
+  .page { display: flex; gap: 10px; height: calc(100vh - 16mm); page-break-after: always; }
+  .page:last-child { page-break-after: avoid; }
+  .header-bar { font-size: 8px; color: #999; display: flex; justify-content: space-between; margin-bottom: 4px; }
+</style>
+</head><body>`;
+
+      pairs.forEach(([r1, r2]) => {
+        const sl1 = getSoignantLabel(r1);
+        const sl2 = r2 ? getSoignantLabel(r2) : '';
+        html += `<div class="header-bar"><span>🌈 Arc-en-Ciel${carteConfigId ? ' — ' + (carteConfigs.find(c => c.id === carteConfigId)?.nom || '') : ''}</span><span>${today}</span></div>
+<div class="page">
+  ${renderCarte(r1, sl1)}
+  ${renderCarte(r2, sl2)}
+</div>`;
+      });
+
+      html += '</body></html>';
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => { win.print(); };
+    }
+
     if (docId === 'detail-prot') {
       const slots = filtreSlotDetail === 'jour'
         ? ['prot_m', 'prot_am', 'prot_s']
@@ -959,6 +1345,84 @@ export default function ImpressionsPage() {
                     {doc.disabled ? 'Bientôt' : 'Imprimer'}
                   </button>
                 </div>
+                {doc.hasCarteFilter && !doc.disabled && (
+                  <div className="px-4 pb-4 pt-3 flex flex-col gap-4 border-t border-gray-100">
+
+                    {/* Section 1 : par étage/appt */}
+                    <div>
+                      <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Par étage ou appartement</p>
+                      <div className="flex flex-wrap gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-500 shrink-0">Appt</span>
+                          <div className="flex gap-1">
+                            <button onClick={() => { setCarteAppt(''); setCarteEtage(''); setCarteConfigId(''); setCarteSoignants([]); setCarteSelectedSoignants([]); }}
+                              className="px-3 h-7 rounded-lg text-xs font-bold text-white"
+                              style={{ background: carteAppt === '' && carteEtage === '' && !carteConfigId ? '#C9A84C' : '#4A2C2A', opacity: (carteAppt !== '' || carteEtage !== '' || carteConfigId) ? 0.35 : 1 }}
+                            >Tous</button>
+                            {[1,2,3,4,5].map(a => (
+                              <button key={a} onClick={() => { setCarteAppt(String(a)); setCarteEtage(''); setCarteConfigId(''); setCarteSoignants([]); setCarteSelectedSoignants([]); }}
+                                className="w-8 h-7 rounded-lg text-xs font-bold text-white"
+                                style={{ background: carteAppt === String(a) ? '#C9A84C' : '#4A2C2A', opacity: carteAppt && carteAppt !== String(a) ? 0.35 : 1 }}
+                              >{a}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-500 shrink-0">Étage</span>
+                          <div className="flex gap-1">
+                            {[['rdc','RDC'],['1er','1er'],['2eme','2ème']].map(([val, label]) => (
+                              <button key={val} onClick={() => { setCarteEtage(e => e === val ? '' : val); setCarteAppt(''); setCarteConfigId(''); setCarteSoignants([]); setCarteSelectedSoignants([]); }}
+                                className="px-3 h-7 rounded-lg text-xs font-bold text-white"
+                                style={{ background: carteEtage === val ? '#C9A84C' : '#4A2C2A', opacity: carteEtage && carteEtage !== val ? 0.35 : 1 }}
+                              >{label}</button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Séparateur */}
+                    <div className="border-t border-dashed border-gray-200" />
+
+                    {/* Section 2 : par soignant */}
+                    <div>
+                      <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Par soignant</p>
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <span className="text-xs font-semibold text-gray-500 shrink-0">Répartition</span>
+                        <div className="flex gap-1 flex-wrap">
+                          {carteConfigs.map(c => (
+                            <button key={c.id}
+                              onClick={() => { loadCarteSoignants(c.id); setCarteAppt(''); setCarteEtage(''); }}
+                              className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                              style={{ background: carteConfigId === c.id ? '#C9A84C' : '#4A2C2A', opacity: carteConfigId && carteConfigId !== c.id ? 0.35 : 1 }}
+                            >{c.nom}</button>
+                          ))}
+                        </div>
+                      </div>
+                      {carteSoignants.length > 0 && (
+                        <div className="flex items-start gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-gray-500 shrink-0 mt-1">Soignants</span>
+                          <div className="flex gap-1 flex-wrap">
+                            <button
+                              onClick={() => setCarteSelectedSoignants(carteSoignants.map(s => s.id))}
+                              className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                              style={{ background: carteSelectedSoignants.length === carteSoignants.length ? '#C9A84C' : '#4A2C2A' }}
+                            >Tous</button>
+                            {carteSoignants.map(s => (
+                              <button key={s.id}
+                                onClick={() => setCarteSelectedSoignants([s.id])}
+                                className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                                style={{ background: carteSelectedSoignants.includes(s.id) ? '#C9A84C' : '#4A2C2A', opacity: !carteSelectedSoignants.includes(s.id) ? 0.35 : 1 }}
+                              >{s.label}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                )}
+
                 {doc.hasApptFilter && !doc.disabled && (
                   <div className="px-4 pb-4 pt-3 flex flex-wrap gap-4 border-t border-gray-100">
                     <div className="flex items-center gap-2">
