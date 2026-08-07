@@ -113,7 +113,7 @@ const DOCS = [
   { id: 'cuisine-a3', label: 'Tableau synthèse cuisine', icon: '🍽️', desc: 'Format A3 paysage — textures & régimes', disabled: true },
   { id: 'falc', label: 'Tableau alimentation FALC', icon: '🥣', desc: 'Simplifié pour les ASH', disabled: true },
   { id: 'risques', label: 'Tableau des risques', icon: '⚠️', desc: 'Par résident et par type de risque' },
-  { id: 'contentions', label: 'Tableau des contentions', icon: '🔒', desc: 'Barrières, grenouillère, coquille, ceinture', disabled: true },
+  { id: 'contentions', label: 'Tableau des contentions', icon: '🔒', desc: 'Barrières, grenouillère, coquille, ceinture — A3 portrait' },
   { id: 'cartes-soignants', label: 'Cartes soignants', icon: '👩‍⚕️', desc: 'Pleine page ou 2/page, unitaire ou global', disabled: true },
 ];
 
@@ -363,6 +363,104 @@ export default function ImpressionsPage() {
   </div>
 </div>
 <div class="doc-footer">${today} — Arc-en-Ciel — Tableau des risques</div>
+</body></html>`;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => { win.print(); };
+    }
+
+    if (docId === 'contentions') {
+      const today = new Date().toLocaleDateString('fr-FR');
+      const CONT_KEYS = [
+        { key: 'barrieres',    label: 'Barrières',     emoji: '🛏️' },
+        { key: 'grenouillere', label: 'Grenouillère',  emoji: '🦵' },
+        { key: 'coquille',     label: 'Coquille',      emoji: '🪑' },
+        { key: 'ceinture',     label: 'Ceinture',      emoji: '🔒' },
+      ];
+
+      const list = [...residents].sort((a, b) => a.chambre - b.chambre);
+
+      const totaux = { barrieres: 0, grenouillere: 0, coquille: 0, ceinture: 0 };
+      list.forEach(r => {
+        const c = r.contentions || {};
+        CONT_KEYS.forEach(({ key }) => { if (c[key]) totaux[key]++; });
+      });
+
+      const hasContention = (r) => {
+        const c = r.contentions || {};
+        return CONT_KEYS.some(({ key }) => !!c[key]);
+      };
+
+      const withCont = list.filter(hasContention);
+
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Tableau des contentions — Arc-en-Ciel</title>
+<style>
+  @page { size: A3 portrait; margin: 10mm; }
+  body { font-family: Arial, sans-serif; font-size: 8px; }
+  h2 { font-size: 13px; font-weight: bold; margin: 0 0 2px 0; }
+  .meta { font-size: 8px; color: #555; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 8px; margin-bottom: 10px; }
+  th, td { border: 1px solid #ccc; padding: 2px 5px; }
+  th { background: #f3f0eb; font-weight: bold; text-align: left; }
+  th.cont { text-align: center; white-space: nowrap; font-size: 8px; }
+  td.val { text-align: center; font-size: 8px; color: #c0392b; font-weight: bold; }
+  td.empty { text-align: center; color: #ddd; }
+  .total-row td { background: #f3f0eb; font-weight: bold; }
+  .total-row td:not(:first-child) { text-align: center; }
+  .sig-block { display: flex; gap: 10mm; margin-top: 8mm; }
+  .sig-box { flex: 1; border: 1px solid #ccc; border-radius: 4px; padding: 6px 10px; min-height: 20mm; }
+  .sig-title { font-size: 9px; font-weight: bold; color: #4A2C2A; margin-bottom: 5px; }
+  .sig-line { border-bottom: 1px solid #bbb; margin-bottom: 10px; padding-bottom: 1px; font-size: 7px; color: #999; }
+  .doc-footer { font-size: 7px; color: #999; margin-top: 6px; text-align: right; }
+</style>
+</head><body>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+  <span style="font-size:16px">🔒</span><h2>Tableau des contentions</h2>
+</div>
+<div class="meta">Arc-en-Ciel EHPAD · ${list.length} résidents · ${withCont.length} avec contention · Mis à jour le ${today}</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:4%">Ch.</th>
+      <th style="width:18%">Résident</th>
+      ${CONT_KEYS.map(c => `<th class="cont">${c.emoji} ${c.label}</th>`).join('')}
+    </tr>
+  </thead>
+  <tbody>
+    ${list.map(r => {
+      const c = r.contentions || {};
+      const hasCont = CONT_KEYS.some(({ key }) => !!c[key]);
+      return `<tr${!hasCont ? ' style="color:#bbb"' : ''}>
+      <td>${r.chambre}</td>
+      <td>${r.nom}${r.prenom ? ' ' + r.prenom[0] + '.' : ''}</td>
+      ${CONT_KEYS.map(({ key }) => c[key]
+        ? `<td class="val">${c[key]}</td>`
+        : `<td class="empty">—</td>`
+      ).join('')}
+    </tr>`;
+    }).join('')}
+    <tr class="total-row">
+      <td colspan="2">Total résidents avec contention</td>
+      ${CONT_KEYS.map(({ key }) => `<td>${totaux[key] || '—'}</td>`).join('')}
+    </tr>
+  </tbody>
+</table>
+<div class="sig-block">
+  <div class="sig-box">
+    <div class="sig-title">Médecin coordonnateur</div>
+    <div class="sig-line">Nom &amp; Signature</div>
+    <div class="sig-line">Date</div>
+  </div>
+  <div class="sig-box">
+    <div class="sig-title">IDE coordinatrice</div>
+    <div class="sig-line">Nom &amp; Signature</div>
+    <div class="sig-line">Date</div>
+  </div>
+</div>
+<div class="doc-footer">${today} — Arc-en-Ciel — Tableau des contentions</div>
 </body></html>`;
 
       const win = window.open('', '_blank');
