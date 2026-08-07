@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { Search, LogOut, Plus, X, Archive, RotateCcw, AlertTriangle, Scale, MoreVertical, DoorOpen, Users, Home } from 'lucide-react';
+import { Search, LogOut, Plus, X, Archive, RotateCcw, AlertTriangle, Scale, MoreVertical, DoorOpen, Users, Home, Printer } from 'lucide-react';
 
 function etage(chambre) {
   const f = Math.floor(chambre / 100);
@@ -236,6 +236,10 @@ export default function ListePage() {
               <a href="/residents/repartition"
                 className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 text-gray-500 hover:text-gray-700 no-underline">
                 <Users size={14} /> Répartition
+              </a>
+              <a href="/residents/impressions"
+                className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 text-gray-500 hover:text-gray-700 no-underline">
+                <Printer size={14} /> Impressions
               </a>
             </div>
 

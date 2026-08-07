@@ -284,7 +284,7 @@ export default function FichePage() {
 
       {isManager() && (
         <div className="max-w-5xl mx-auto px-4 pb-4 no-print">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-3">
             <button
               onClick={save}
               disabled={!dirty || saving}
