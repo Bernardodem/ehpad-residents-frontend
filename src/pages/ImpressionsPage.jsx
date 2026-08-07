@@ -111,7 +111,7 @@ const DOCS = [
   { id: 'detail-prot', label: 'Détail protections par appartement', icon: '🩲', desc: '5 pages A4 — une par appartement' },
   { id: 'dotation-prot', label: 'Dotation protection', icon: '📦', desc: 'Quantités jour / semaine / mois — filtres étage, appartement, slot' },
   { id: 'cuisine-a3', label: 'Tableau synthèse cuisine', icon: '🍽️', desc: 'Format A3 paysage — textures & régimes' },
-  { id: 'falc', label: 'Tableau alimentation FALC', icon: '🥣', desc: 'Simplifié pour les ASH', disabled: true },
+  { id: 'falc', label: 'Tableau alimentation FALC', icon: '🥣', desc: 'Une page par appartement — texture, lieux, aide repas, PDJ, notes', hasApptFilter: true },
   { id: 'risques', label: 'Tableau des risques', icon: '⚠️', desc: 'Par résident et par type de risque' },
   { id: 'contentions', label: 'Tableau des contentions', icon: '🔒', desc: 'Barrières, grenouillère, coquille, ceinture — A3 portrait' },
   { id: 'cartes-soignants', label: 'Cartes soignants', icon: '👩‍⚕️', desc: 'Pleine page ou 2/page, unitaire ou global', disabled: true },
@@ -130,8 +130,12 @@ export default function ImpressionsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const [filtreAppt, setFiltreAppt] = useState('');
-  const [filtreSlot, setFiltreSlot] = useState('tout');
+  const [filtreApptDetail, setFiltreApptDetail] = useState('');
+  const [filtreSlotDetail, setFiltreSlotDetail] = useState('tout');
+  const [filtreApptDotation, setFiltreApptDotation] = useState('');
+  const [filtreSlotDotation, setFiltreSlotDotation] = useState('tout');
+  const [filtreApptFalc, setFiltreApptFalc] = useState('');
+  const [filtreEtageFalc, setFiltreEtageFalc] = useState('');
 
   const handlePrint = (docId) => {
     if (docId === 'dotation-prot') {
@@ -147,9 +151,9 @@ export default function ImpressionsPage() {
         return `Appartement ${n}`;
       };
 
-      const slotsActifs = filtreSlot === 'jour'
+      const slotsActifs = filtreSlotDotation === 'jour'
         ? ['prot_m', 'prot_am', 'prot_s']
-        : filtreSlot === 'nuit'
+        : filtreSlotDotation === 'nuit'
         ? ['prot_n']
         : ['prot_m', 'prot_am', 'prot_s', 'prot_n'];
 
@@ -160,8 +164,8 @@ export default function ImpressionsPage() {
         return `${type}${taille ? ' ' + taille : ''} ${couleur}`;
       };
 
-      const apptsFiltres = filtreAppt
-        ? [parseInt(filtreAppt)]
+      const apptsFiltres = filtreApptDotation
+        ? [parseInt(filtreApptDotation)]
         : [1, 2, 3, 4, 5];
 
       // Même filtres pour detail-prot
@@ -211,7 +215,7 @@ export default function ImpressionsPage() {
   <span>📦</span><h2>Dotation protections par appartement</h2>
 </div>
 <div class="meta">
-  Arc-en-Ciel EHPAD — ${today} — Slot : ${slotLabel[filtreSlot]}${filtreAppt ? ' — ' + apptLabel(parseInt(filtreAppt)) : ' — Tous les appartements'}
+  Arc-en-Ciel EHPAD — ${today} — Slot : ${slotLabel[filtreSlotDotation]}${filtreApptDotation ? ' — ' + apptLabel(parseInt(filtreApptDotation)) : ' — Tous les appartements'}
 </div>`;
 
       sections.forEach(({ appt, counts, nbRes }) => {
@@ -659,16 +663,152 @@ export default function ImpressionsPage() {
       win.onload = () => { win.print(); };
     }
 
+    if (docId === 'falc') {
+      const today = new Date().toLocaleDateString('fr-FR');
+
+      const TEXTURE_EMOJI = { NORMALE: '🟢', HACHEE: '🟡', MIXEE: '🔵' };
+      const TEXTURE_LABEL = { NORMALE: 'Normale', HACHEE: 'Hachée', MIXEE: 'Mixée' };
+
+      const lieuIcon = (lieu) => {
+        if (!lieu) return '—';
+        if (lieu === 'Chambre') return '🛏 CHB';
+        if (lieu === 'Salle') return '🍽 SALLE';
+        return lieu;
+      };
+
+      const PDJ_EMOJI = {
+        'Café': '☕', 'Café au lait': '☕ 🥛', 'Thé': '🍵', 'Lait': '🥛',
+        'Chocolat au lait': '🍫', "Jus d'orange": "🍊", "Jus de pomme": "🍏",
+        'Baguette': '🥖', 'Pain de mie': '🍞', 'Beurre': '🧈', 'Confiture': '🍓',
+        'Blédine': '🫙',
+      };
+
+      const appts = filtreApptFalc
+        ? [parseInt(filtreApptFalc)]
+        : filtreEtageFalc === 'rdc' ? [1]
+        : filtreEtageFalc === '1er' ? [2, 3]
+        : filtreEtageFalc === '2eme' ? [4, 5]
+        : [1, 2, 3, 4, 5];
+      const apptLabel = (n) => {
+        if (n === 1) return { title: 'Appartement 1 — Rez-de-chaussée', range: '101–112' };
+        if (n === 2) return { title: 'Appartement 2 — 1er étage', range: '201–212' };
+        if (n === 3) return { title: 'Appartement 3 — 1er étage', range: '301–312' };
+        if (n === 4) return { title: 'Appartement 4 — 2ème étage', range: '401–412' };
+        if (n === 5) return { title: 'Appartement 5 — 2ème étage', range: '501–512' };
+        return { title: `Appartement ${n}`, range: '' };
+      };
+
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Tableau alimentation ASH — Arc-en-Ciel</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  body { font-family: Arial, sans-serif; font-size: 9px; display: flex; flex-direction: column; justify-content: center; min-height: 95vh; }
+  .page-break { page-break-after: always; }
+  .header { background: linear-gradient(135deg, #3A2020, #5C3A37); color: white; padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .header-title { font-size: 13px; font-weight: bold; }
+  .header-sub { font-size: 9px; opacity: 0.8; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+  th, td { border: 1px solid #ddd; padding: 4px 6px; vertical-align: middle; }
+  th { background: #f3f0eb; font-weight: bold; text-align: center; font-size: 8.5px; }
+  th.left { text-align: left; }
+  td.center { text-align: center; }
+  td.lieu { text-align: center; white-space: nowrap; font-size: 8.5px; }
+  td.aide { text-align: center; font-size: 8.5px; }
+  .aide-required { outline: 2px solid #c0392b; }
+  .texture-badge { font-size: 8.5px; white-space: nowrap; }
+  .regimes { color: #c0392b; font-size: 8px; }
+  .pdj-emojis { font-size: 11px; letter-spacing: 1px; }
+  .pdj-text { font-size: 7.5px; color: #555; }
+  .notes { font-size: 7.5px; color: #777; font-style: italic; }
+  .footer { font-size: 7px; color: #999; margin-top: 5px; display: flex; justify-content: space-between; }
+  .legend { font-size: 7px; color: #666; }
+</style>
+</head><body>`;
+
+      appts.forEach((appt, idx) => {
+        const info = apptLabel(appt);
+        const list = residents
+          .filter(r => Math.floor(r.chambre / 100) === appt)
+          .sort((a, b) => a.chambre - b.chambre);
+
+        html += `<div${idx < 4 ? ' class="page-break"' : ''}>
+<div class="header">
+  <div>
+    <div class="header-title" style="text-align:center;width:100%">EHPAD Arc en Ciel — Habitudes alimentaires — ${info.title}</div>
+    <div class="header-sub" style="text-align:center">Chambres ${info.range}</div>
+  </div>
+  <div class="header-sub" style="text-align:right;white-space:nowrap">Mise à jour le : ${today}</div>
+</div>
+<table>
+  <thead><tr>
+    <th class="left" style="width:3%">CH.</th>
+    <th class="left" style="width:10%">RÉSIDENT</th>
+    <th style="width:8%">TEXTURE</th>
+    <th style="width:5%">🌅 PD</th>
+    <th style="width:5%">☀️ DJ</th>
+    <th style="width:5%">🌙 DÎNER</th>
+    <th style="width:8%">🥄 AIDE REPAS</th>
+    <th style="width:10%">🚫 RÉGIMES</th>
+    <th style="width:14%">☀️ PETIT DÉJEUNER</th>
+    <th style="width:14%">ℹ️ NOTES / ALLERGIE</th>
+  </tr></thead>
+  <tbody>`;
+
+        list.forEach(r => {
+          const texture = r.texture || 'NORMALE';
+          const regimes = (r.regimes || []);
+          const cno = (r.cno || []);
+          const pdj = (r.pdj || []);
+          const aideRequired = r.aide_repas && r.aide_repas !== 'Autonome';
+
+          const pdJEmojis = pdj.map(p => PDJ_EMOJI[p] || '').filter(Boolean).join(' ');
+          const pdJText = pdj.join(', ');
+
+          const allRegimes = [...regimes, ...cno.filter(c => c === 'Double ration')];
+
+          html += `<tr${aideRequired ? ' class="aide-required"' : ''}>
+      <td>${r.chambre}</td>
+      <td>${r.nom}<br><span style="color:#777">${r.prenom || ''}</span></td>
+      <td class="center texture-badge">${TEXTURE_EMOJI[texture] || ''} ${TEXTURE_LABEL[texture] || texture}</td>
+      <td class="lieu">${lieuIcon(r.lieu_pd)}</td>
+      <td class="lieu">${lieuIcon(r.lieu_dj)}</td>
+      <td class="lieu">${lieuIcon(r.lieu_d)}</td>
+      <td class="aide">${r.aide_repas || 'Autonome'}</td>
+      <td class="regimes">${allRegimes.length ? allRegimes.map(reg => `🚫 ${reg}`).join('<br>') : '—'}</td>
+      <td>
+        <div class="pdj-emojis">${pdJEmojis}</div>
+        <div class="pdj-text">${pdJText}</div>
+      </td>
+      <td class="notes">${r.allergie || ''} ${r.partic_rep || ''}</td>
+    </tr>`;
+        });
+
+        html += `</tbody></table>
+<div class="footer">
+  <span class="legend">Arc-en-Ciel EHPAD — Document interne ASH &nbsp;⬜ Encadré = Aide au repas requise</span>
+  <span>${info.title} · ${list.length} résidents</span>
+</div>
+</div>`;
+      });
+
+      html += '</body></html>';
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => { win.print(); };
+    }
+
     if (docId === 'detail-prot') {
-      const slots = filtreSlot === 'jour'
+      const slots = filtreSlotDetail === 'jour'
         ? ['prot_m', 'prot_am', 'prot_s']
-        : filtreSlot === 'nuit'
+        : filtreSlotDotation === 'nuit'
         ? ['prot_n']
         : ['prot_m', 'prot_am', 'prot_s', 'prot_n'];
       const slotHeaders = {
         prot_m: 'Matin', prot_am: 'Après-midi', prot_s: 'Soir', prot_n: 'Nuit'
       };
-      const appts = filtreAppt ? [parseInt(filtreAppt)] : [1, 2, 3, 4, 5];
+      const appts = filtreApptDetail ? [parseInt(filtreApptDetail)] : [1, 2, 3, 4, 5];
       const today = new Date().toLocaleDateString('fr-FR');
 
       const apptLabel = (n) => {
@@ -819,21 +959,54 @@ export default function ImpressionsPage() {
                     {doc.disabled ? 'Bientôt' : 'Imprimer'}
                   </button>
                 </div>
+                {doc.hasApptFilter && !doc.disabled && (
+                  <div className="px-4 pb-4 pt-3 flex flex-wrap gap-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500 shrink-0">Appt</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setFiltreApptFalc('')}
+                          className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                          style={{ background: filtreApptFalc === '' ? '#C9A84C' : '#4A2C2A', opacity: filtreApptFalc !== '' ? 0.35 : 1 }}
+                        >Tous</button>
+                        {[1,2,3,4,5].map(a => (
+                          <button key={a}
+                            onClick={() => { setFiltreApptFalc(f => f === String(a) ? '' : String(a)); setFiltreEtageFalc(''); }}
+                            className="w-8 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                            style={{ background: filtreApptFalc === String(a) ? '#C9A84C' : '#4A2C2A', opacity: filtreApptFalc && filtreApptFalc !== String(a) ? 0.35 : 1 }}
+                          >{a}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500 shrink-0">Étage</span>
+                      <div className="flex gap-1">
+                        {[['','Tous'],['rdc','RDC'],['1er','1er'],['2eme','2ème']].map(([val, label]) => (
+                          <button key={val}
+                            onClick={() => { setFiltreEtageFalc(val); setFiltreApptFalc(''); }}
+                            className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                            style={{ background: filtreEtageFalc === val ? '#C9A84C' : '#4A2C2A', opacity: filtreEtageFalc !== val ? 0.35 : 1 }}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {doc.id === 'detail-prot' && !doc.disabled && (
                   <div className="px-4 pb-4 pt-3 flex flex-wrap gap-4 border-t border-gray-100">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-gray-500 shrink-0">Appt</span>
                       <div className="flex gap-1">
                         <button
-                          onClick={() => setFiltreAppt('')}
+                          onClick={() => setFiltreApptDetail('')}
                           className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
-                          style={{ background: filtreAppt === '' ? '#C9A84C' : '#4A2C2A', opacity: filtreAppt !== '' ? 0.35 : 1 }}
+                          style={{ background: filtreApptDetail === '' ? '#C9A84C' : '#4A2C2A', opacity: filtreApptDetail !== '' ? 0.35 : 1 }}
                         >Tous</button>
                         {[1,2,3,4,5].map(a => (
                           <button key={a}
-                            onClick={() => setFiltreAppt(f => f === String(a) ? '' : String(a))}
+                            onClick={() => setFiltreApptDetail(f => f === String(a) ? '' : String(a))}
                             className="w-8 h-7 rounded-lg text-xs font-bold text-white transition-all"
-                            style={{ background: filtreAppt === String(a) ? '#C9A84C' : '#4A2C2A', opacity: filtreAppt && filtreAppt !== String(a) ? 0.35 : 1 }}
+                            style={{ background: filtreApptDetail === String(a) ? '#C9A84C' : '#4A2C2A', opacity: filtreApptDetail && filtreApptDetail !== String(a) ? 0.35 : 1 }}
                           >{a}</button>
                         ))}
                       </div>
@@ -843,9 +1016,9 @@ export default function ImpressionsPage() {
                       <div className="flex gap-1">
                         {[['tout','Jour + Nuit'],['jour','Jour'],['nuit','Nuit']].map(([val, label]) => (
                           <button key={val}
-                            onClick={() => setFiltreSlot(val)}
+                            onClick={() => setFiltreSlotDetail(val)}
                             className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
-                            style={{ background: filtreSlot === val ? '#C9A84C' : '#4A2C2A', opacity: filtreSlot !== val ? 0.35 : 1 }}
+                            style={{ background: filtreSlotDetail === val ? '#C9A84C' : '#4A2C2A', opacity: filtreSlotDetail !== val ? 0.35 : 1 }}
                           >{label}</button>
                         ))}
                       </div>
@@ -858,15 +1031,15 @@ export default function ImpressionsPage() {
                       <span className="text-xs font-semibold text-gray-500 shrink-0">Appt</span>
                       <div className="flex gap-1">
                         <button
-                          onClick={() => setFiltreAppt('')}
+                          onClick={() => setFiltreApptDotation('')}
                           className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
-                          style={{ background: filtreAppt === '' ? '#C9A84C' : '#4A2C2A', opacity: filtreAppt !== '' ? 0.35 : 1 }}
+                          style={{ background: filtreApptDotation === '' ? '#C9A84C' : '#4A2C2A', opacity: filtreApptDotation !== '' ? 0.35 : 1 }}
                         >Tous</button>
                         {[1,2,3,4,5].map(a => (
                           <button key={a}
-                            onClick={() => setFiltreAppt(f => f === String(a) ? '' : String(a))}
+                            onClick={() => setFiltreApptDotation(f => f === String(a) ? '' : String(a))}
                             className="w-8 h-7 rounded-lg text-xs font-bold text-white transition-all"
-                            style={{ background: filtreAppt === String(a) ? '#C9A84C' : '#4A2C2A', opacity: filtreAppt && filtreAppt !== String(a) ? 0.35 : 1 }}
+                            style={{ background: filtreApptDotation === String(a) ? '#C9A84C' : '#4A2C2A', opacity: filtreApptDotation && filtreApptDotation !== String(a) ? 0.35 : 1 }}
                           >{a}</button>
                         ))}
                       </div>
@@ -876,9 +1049,9 @@ export default function ImpressionsPage() {
                       <div className="flex gap-1">
                         {[['tout','Jour + Nuit'],['jour','Jour'],['nuit','Nuit']].map(([val, label]) => (
                           <button key={val}
-                            onClick={() => setFiltreSlot(val)}
+                            onClick={() => setFiltreSlotDotation(val)}
                             className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
-                            style={{ background: filtreSlot === val ? '#C9A84C' : '#4A2C2A', opacity: filtreSlot !== val ? 0.35 : 1 }}
+                            style={{ background: filtreSlotDotation === val ? '#C9A84C' : '#4A2C2A', opacity: filtreSlotDotation !== val ? 0.35 : 1 }}
                           >{label}</button>
                         ))}
                       </div>
