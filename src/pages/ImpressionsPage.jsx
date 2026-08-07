@@ -315,7 +315,7 @@ export default function ImpressionsPage() {
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
-      win.onload = () => { win.print(); };
+      win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
     }
 
     if (docId === 'risques') {
@@ -403,7 +403,7 @@ export default function ImpressionsPage() {
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
-      win.onload = () => { win.print(); };
+      win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
     }
 
     if (docId === 'contentions') {
@@ -501,7 +501,7 @@ export default function ImpressionsPage() {
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
-      win.onload = () => { win.print(); };
+      win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
     }
 
     if (docId === 'cuisine-a3') {
@@ -687,7 +687,7 @@ export default function ImpressionsPage() {
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
-      win.onload = () => { win.print(); };
+      win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
     }
 
     if (docId === 'falc') {
@@ -823,7 +823,7 @@ export default function ImpressionsPage() {
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
-      win.onload = () => { win.print(); };
+      win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
     }
 
     if (docId === 'cartes-soignants') {
@@ -1037,7 +1037,7 @@ export default function ImpressionsPage() {
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
-      win.onload = () => { win.print(); };
+      win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
     }
 
     if (docId === 'cartes-soignants') {
@@ -1182,7 +1182,7 @@ export default function ImpressionsPage() {
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
-      win.onload = () => { win.print(); };
+      win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
     }
 
     if (docId === 'detail-prot') {
@@ -1285,7 +1285,7 @@ export default function ImpressionsPage() {
       const win = window.open('', '_blank');
       win.document.write(html);
       win.document.close();
-      win.onload = () => { win.print(); };
+      win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
     }
   };
 
