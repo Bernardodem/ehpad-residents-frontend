@@ -1,6 +1,6 @@
 import UserMenu from '../components/UserMenu';
 import Footer from '../components/Footer';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
@@ -12,14 +12,15 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 
-function ResidentCard({ resident }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `${resident.chambre}` });
+function ResidentCard({ resident, isBinome, dragId }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: dragId || `${resident.chambre}` });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : {};
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}
       className="bg-white rounded-lg p-2 shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing select-none">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-white px-1.5 py-0.5 rounded shrink-0" style={{ background: '#4A2C2A' }}>{resident.chambre}</span>
+        <span className="text-xs font-bold text-white px-1.5 py-0.5 rounded shrink-0" style={{ background: isBinome ? '#2980b9' : '#4A2C2A' }}>{resident.chambre}</span>
+          {isBinome && <span className="text-xs font-bold px-1 py-0.5 rounded" style={{ background: '#d6eaf8', color: '#2980b9', fontSize: '9px' }}>binôme</span>}
         <div className="min-w-0">
           <p className="text-xs font-semibold text-gray-900 truncate">{resident.nom} {resident.prenom}</p>
           {resident.toilette && <p className="text-xs text-gray-400 truncate">{resident.toilette}</p>}
@@ -29,7 +30,7 @@ function ResidentCard({ resident }) {
   );
 }
 
-function SoignantColonne({ soignant, residents, onRemove, canEdit }) {
+function SoignantColonne({ soignant, residents, onRemove, onRemoveBinome, canEdit }) {
   const { setNodeRef, isOver } = useDroppable({ id: `soignant-${soignant.id}` });
   return (
     <div className="flex flex-col min-w-44 w-44 shrink-0">
@@ -39,11 +40,15 @@ function SoignantColonne({ soignant, residents, onRemove, canEdit }) {
       <div ref={setNodeRef}
         className={`flex-1 min-h-40 rounded-b-xl p-2 space-y-1.5 border-2 transition-colors ${isOver ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
         {residents.map(r => (
-          <div key={r.chambre} className="relative group">
-            <ResidentCard resident={r} />
-            {canEdit && (
+          <div key={`${r.chambre}-${r.isBinome ? "b" : "p"}`} className="relative group">
+            <ResidentCard resident={r} isBinome={r.isBinome} dragId={r.isBinome ? `${r.chambre}-b` : String(r.chambre)} />
+            {canEdit && !r.isBinome && (
               <button onClick={() => onRemove(r.chambre)}
                 className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs hidden group-hover:flex items-center justify-center">×</button>
+            )}
+            {canEdit && r.isBinome && (
+              <button onClick={() => onRemoveBinome(r.chambre)}
+                className="absolute -top-1 -right-1 w-4 h-4 bg-blue-400 text-white rounded-full text-xs hidden group-hover:flex items-center justify-center">×</button>
             )}
           </div>
         ))}
@@ -57,13 +62,20 @@ function SoignantColonne({ soignant, residents, onRemove, canEdit }) {
 
 function NonAffectesZone({ residents, filtres }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'non-affectes' });
+  // Doubler les résidents Binôme non affectés : carte marron + carte bleue
+  // Les résidents Binôme déjà affectés (sans binôme) arrivent avec _isBinomeCard=true -> carte bleue seulement
+  const residentsAvecBinomes = residents.flatMap(r => {
+    if (r._isBinomeCard) return [{ ...r, isBinome: true, _dragId: `${r.chambre}-b` }];
+    if (r.toilette === 'Binôme') return [{ ...r, isBinome: false }, { ...r, isBinome: true, _dragId: `${r.chambre}-b` }];
+    return [{ ...r, isBinome: false }];
+  });
   return (
     <div>
       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Non affectés ({residents.length})</p>
       {filtres}
       <div ref={setNodeRef}
         className={`min-h-12 rounded-xl p-2 space-y-1.5 border-2 transition-colors ${isOver ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
-        {residents.map(r => <ResidentCard key={r.chambre} resident={r} />)}
+        {residentsAvecBinomes.map(r => <ResidentCard key={r._dragId || r.chambre} resident={r} isBinome={r.isBinome} dragId={r._dragId || String(r.chambre)} />)}
         {residents.length === 0 && <p className="text-xs text-gray-300 text-center py-3">Tous les résidents sont affectés ✓</p>}
       </div>
     </div>
@@ -92,6 +104,7 @@ export default function RepartitionPage() {
   const [configId, setConfigId] = useState('');
   const [config, setConfig] = useState(null);
   const [affectations, setAffectations] = useState([]);
+  const affectationsRef = useRef([]);
   const [nonAffectes, setNonAffectes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeResident, setActiveResident] = useState(null);
@@ -123,7 +136,10 @@ export default function RepartitionPage() {
     setLoading(true);
     try {
       const { data } = await api.get(`/repartition/configs/${configId}/affectations`);
-      setAffectations(data.affectations || []);
+      const aff = data.affectations || [];
+      console.log('load affectations:', aff);
+      setAffectations(aff);
+      affectationsRef.current = aff;
       setNonAffectes(data.non_affectes || []);
     } catch { toast.error('Erreur de chargement'); }
     finally { setLoading(false); }
@@ -140,35 +156,79 @@ export default function RepartitionPage() {
     } catch { toast.error('Erreur'); }
   };
 
+  const setBinome = async (chambre, binomeId) => {
+    try {
+      const aff = affectationsRef.current.find(a => parseInt(a.chambre) === chambre);
+      console.log('setBinome', chambre, binomeId, aff);
+      if (!aff) { toast.error('Résident non trouvé dans les affectations'); return; }
+      await api.patch(`/repartition/configs/${configId}/affectations/${chambre}`, { soignant_id: aff.soignant_id, binome_soignant_id: binomeId });
+      await load();
+      toast.success('Binôme ajouté');
+    } catch (e) { console.error(e); toast.error('Erreur binôme'); }
+  };
+
+  const removeBinome = async (chambre) => {
+    try {
+      const aff = affectations.find(a => a.chambre === chambre);
+      if (!aff) return;
+      await api.patch(`/repartition/configs/${configId}/affectations/${chambre}`, { soignant_id: aff.soignant_id, binome_soignant_id: null });
+      await load();
+    } catch { toast.error('Erreur'); }
+  };
+
   const affecter = async (chambre, soignantId) => {
     try {
-      await api.patch(`/repartition/configs/${configId}/affectations/${chambre}`, { soignant_id: soignantId });
+      const existing = affectationsRef.current.find(a => parseInt(a.chambre) === chambre);
+      await api.patch(`/repartition/configs/${configId}/affectations/${chambre}`, { soignant_id: soignantId, binome_soignant_id: existing?.binome_soignant_id || null });
       await load();
     } catch { toast.error('Erreur affectation'); }
   };
 
   const desaffecter = async (chambre) => {
     try {
-      await api.patch(`/repartition/configs/${configId}/affectations/${chambre}`, { soignant_id: null });
+      await api.patch(`/repartition/configs/${configId}/affectations/${chambre}`, { soignant_id: null, binome_soignant_id: null });
       await load();
     } catch { toast.error('Erreur'); }
   };
 
   const handleDragStart = ({ active }) => {
-    const chambre = parseInt(active.id);
-    setActiveResident(affectations.find(a => a.chambre === chambre) || nonAffectes.find(r => r.chambre === chambre));
+    const isBinome = active.id.toString().endsWith('-b');
+    const chambre = parseInt(active.id.toString().replace('-b', ''));
+    const found = affectations.find(a => a.chambre === chambre) || nonAffectes.find(r => r.chambre === chambre);
+    setActiveResident(found ? { ...found, isBinome } : null);
   };
 
   const handleDragEnd = async ({ active, over }) => {
     setActiveResident(null);
     if (!over) return;
-    const chambre = parseInt(active.id);
-    if (over.id === 'non-affectes') await desaffecter(chambre);
-    else if (over.id.startsWith('soignant-')) await affecter(chambre, over.id.replace('soignant-', ''));
+    const isBinomeDrag = active.id.toString().endsWith('-b');
+    const chambre = parseInt(active.id.toString().replace('-b', ''));
+    if (over.id === 'non-affectes') {
+      if (isBinomeDrag) await removeBinome(chambre);
+      else await desaffecter(chambre);
+    } else if (over.id.startsWith('soignant-')) {
+      const targetSoignantId = over.id.replace('soignant-', '');
+      if (isBinomeDrag) {
+        const existing = affectationsRef.current.find(a => parseInt(a.chambre) === chambre);
+        if (!existing || !existing.soignant_id) {
+          toast.error('Affectez d`abord ce résident à un soignant principal');
+          return;
+        }
+        if (existing.soignant_id === targetSoignantId) {
+          toast.error('Le binôme doit être un soignant différent');
+          return;
+        }
+        await setBinome(chambre, targetSoignantId);
+      } else {
+        await affecter(chambre, targetSoignantId);
+      }
+    }
   };
 
   const affParSoignant = (config?.soignants || []).reduce((acc, s) => {
-    acc[s.id] = affectations.filter(a => a.soignant_id === s.id);
+    const principaux = affectations.filter(a => a.soignant_id === s.id).map(a => ({ ...a, isBinome: false }));
+    const binomes = affectations.filter(a => a.binome_soignant_id === s.id).map(a => ({ ...a, isBinome: true }));
+    acc[s.id] = [...principaux, ...binomes].sort((a, b) => a.chambre - b.chambre);
     return acc;
   }, {});
 
@@ -178,7 +238,14 @@ export default function RepartitionPage() {
     return acc;
   }, {});
 
-  const nonAffectesFiltres = nonAffectes.filter(r => {
+  // Ajouter les résidents Binôme affectés sans binôme dans non affectés (carte bleue uniquement)
+  const binomesNonAssignes = affectations
+    .filter(a => a.toilette === 'Binôme' && a.soignant_id && !a.binome_soignant_id)
+    .map(a => ({ ...a, _isBinomeCard: true }));
+
+  const nonAffectesEtendu = [...nonAffectes, ...binomesNonAssignes].sort((a, b) => a.chambre - b.chambre);
+
+  const nonAffectesFiltres = nonAffectesEtendu.filter(r => {
     if (!filtreEtageNonAff) return true;
     const appt = Math.floor(r.chambre / 100);
     return ({ 'RDC': [1], '1er étage': [2, 3], '2ème étage': [4, 5] }[filtreEtageNonAff] || []).includes(appt);
@@ -273,7 +340,7 @@ export default function RepartitionPage() {
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{etage}</p>
                     <div className="flex gap-3 overflow-x-auto pb-2">
                       {soignants.map(s => (
-                        <SoignantColonne key={s.id} soignant={s} residents={affParSoignant[s.id] || []} onRemove={desaffecter} canEdit={isManager()} />
+                        <SoignantColonne key={s.id} soignant={s} residents={affParSoignant[s.id] || []} onRemove={desaffecter} onRemoveBinome={removeBinome} canEdit={isManager()} />
                       ))}
                     </div>
                   </div>
