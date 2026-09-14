@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Settings, RefreshCw, Archive, Home } from 'lucide-react';
+import { ArrowLeft, Settings, RefreshCw, Archive, Home, Printer } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, DragOverlay
@@ -155,6 +155,99 @@ export default function RepartitionPage() {
       await load();
       toast.success('Répartition réinitialisée');
     } catch { toast.error('Erreur'); }
+  };
+
+  const imprimerRepartition = () => {
+    if (!config) return;
+    const today = new Date().toLocaleDateString('fr-FR');
+    const JOURS_FR = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+    // Grouper soignants par étage
+    const byEtage = {};
+    for (const s of (config.soignants || [])) {
+      const e = s.etage || 'Autre';
+      if (!byEtage[e]) byEtage[e] = [];
+      byEtage[e].push(s);
+    }
+
+    const renderToilette = (t) => {
+      if (!t) return '';
+      const colors = {
+        'Autonome': '#27ae60', 'Stimulation': '#8e44ad',
+        'Aide partielle': '#f39c12', 'Aide totale': '#e74c3c', 'Binôme': '#2980b9'
+      };
+      const bg = colors[t] || '#999';
+      return `<span style="background:${bg};color:white;padding:1px 6px;border-radius:10px;font-size:8px;white-space:nowrap">${t}</span>`;
+    };
+
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Répartition — Arc-en-Ciel</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  body { font-family: Arial, sans-serif; font-size: 8px; margin: 0; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .header-title { font-size: 14px; font-weight: bold; text-align: center; flex: 1; }
+  .header-logo { font-size: 10px; color: #4A2C2A; font-weight: bold; }
+  .header-date { font-size: 9px; color: #777; }
+  .etage-section { margin-bottom: 8px; }
+  .etage-label { background: #3A2020; color: white; padding: 3px 8px; font-size: 9px; font-weight: bold; margin-bottom: 4px; display: inline-block; border-radius: 4px; }
+  .soignants-row { display: flex; gap: 6px; }
+  .soignant-col { flex: 1; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; min-width: 0; }
+  .soignant-header { background: #4A2C2A; color: white; padding: 3px 6px; font-size: 8px; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #f3f0eb; font-size: 7px; padding: 2px 3px; text-align: left; border-bottom: 1px solid #ddd; }
+  td { font-size: 7.5px; padding: 2px 3px; border-bottom: 1px solid #f0f0f0; }
+  td.nom { font-weight: bold; }
+  .binome-badge { font-size: 6px; color: #2980b9; font-weight: bold; vertical-align: super; }
+</style>
+</head><body>
+<div class="header">
+  <div class="header-logo">🌈 Arc-en-Ciel EHPAD</div>
+  <div class="header-title">Configuration : ${config.nom}</div>
+  <div class="header-date">📅 ${today}</div>
+</div>`;
+
+    for (const [etage, soignants] of Object.entries(byEtage)) {
+      html += `<div class="etage-section">
+  <div class="etage-label">${etage}</div>
+  <div class="soignants-row">`;
+      for (const s of soignants) {
+        const residents = (affectations || []).filter(a => a.soignant_id === s.id).sort((a, b) => a.chambre - b.chambre);
+        const binomes = (affectations || []).filter(a => a.binome_soignant_id === s.id).sort((a, b) => a.chambre - b.chambre);
+        html += `<div class="soignant-col">
+  <div class="soignant-header">${s.label} (${residents.length})</div>
+  <table>
+    <thead><tr><th>Ch.</th><th>Nom</th><th>Prénom</th><th>Toilette</th></tr></thead>
+    <tbody>`;
+        for (const r of residents) {
+          const isBinome = binomes.some(b => b.chambre === r.chambre);
+          html += `<tr>
+    <td>${r.chambre}</td>
+    <td class="nom">${r.nom || ''}${isBinome ? '<span class="binome-badge"> B</span>' : ''}</td>
+    <td>${r.prenom || ''}</td>
+    <td>${renderToilette(r.toilette)}</td>
+  </tr>`;
+        }
+        for (const b of binomes) {
+          if (!residents.some(r => r.chambre === b.chambre)) {
+            html += `<tr style="opacity:0.6">
+    <td>${b.chambre}</td>
+    <td class="nom">${b.nom || ''}<span class="binome-badge"> B</span></td>
+    <td>${b.prenom || ''}</td>
+    <td>${renderToilette(b.toilette)}</td>
+  </tr>`;
+          }
+        }
+        html += `</tbody></table></div>`;
+      }
+      html += `</div></div>`;
+    }
+
+    html += '</body></html>';
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => { win.print(); setTimeout(() => win.close(), 1000); };
   };
 
   const setBinome = async (chambre, binomeId) => {
@@ -308,6 +401,11 @@ export default function RepartitionPage() {
               {c.nom}
             </button>
           ))}
+          {config && (
+            <button onClick={imprimerRepartition} className="px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
+              <Printer size={15} /> Imprimer
+            </button>
+          )}
           {isManager() && (
             <button onClick={reinitialiser} className="ml-auto px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
               <RefreshCw size={15} /> Réinitialiser la configuration
