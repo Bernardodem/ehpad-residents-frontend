@@ -547,7 +547,13 @@ function ConfigModal({ configs, onClose, onSaved }) {
                       <div><label className="lbl">N°</label><input className="inp" type="number" value={s.numero} onChange={e => updateSoignant(idx, 'numero', parseInt(e.target.value))} /></div>
                       <div className="col-span-2"><label className="lbl">Label</label><input className="inp" value={s.label} onChange={e => updateSoignant(idx, 'label', e.target.value)} /></div>
                     </div>
-                    <div><label className="lbl">Étage</label><input className="inp" value={s.etage || ''} onChange={e => updateSoignant(idx, 'etage', e.target.value)} placeholder="RDC, 1er étage..." /></div>
+                    <div><label className="lbl">Étage</label>
+<select className="inp" value={s.etage || ''} onChange={e => updateSoignant(idx, 'etage', e.target.value)}>
+  <option value="">— Choisir —</option>
+  <option value="RDC">RDC</option>
+  <option value="1er étage">1er étage</option>
+  <option value="2ème étage">2ème étage</option>
+</select></div>
                     <div><label className="lbl">Chambres par défaut</label><input className="inp" value={(s.chambres_default || []).join(', ')} onChange={e => updateChambres(idx, e.target.value)} placeholder="101, 102, 103..." /></div>
                     <button onClick={() => removeSoignant(idx)} className="text-xs text-red-500">Supprimer</button>
                   </div>
