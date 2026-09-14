@@ -12,18 +12,32 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 
+const TOILETTE_BADGE = {
+  'Autonome':      { bg: '#27ae60', label: 'Autonome' },
+  'Stimulation':   { bg: '#8e44ad', label: 'Stimulation' },
+  'Aide partielle':{ bg: '#f39c12', label: 'Aide partielle' },
+  'Aide totale':   { bg: '#e74c3c', label: 'Aide totale' },
+  'Binôme':        { bg: '#2980b9', label: 'Binôme' },
+};
+
 function ResidentCard({ resident, isBinome, dragId }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: dragId || `${resident.chambre}` });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : {};
+  const toiletteBadge = isBinome ? TOILETTE_BADGE['Binôme'] : (resident.toilette ? TOILETTE_BADGE[resident.toilette] : null);
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}
       className="bg-white rounded-lg p-2 shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing select-none">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-white px-1.5 py-0.5 rounded shrink-0" style={{ background: isBinome ? '#2980b9' : '#4A2C2A' }}>{resident.chambre}</span>
-          {isBinome && <span className="text-xs font-bold px-1 py-0.5 rounded" style={{ background: '#d6eaf8', color: '#2980b9', fontSize: '9px' }}>binôme</span>}
-        <div className="min-w-0">
+        <span className="text-xs font-bold text-white px-1.5 py-0.5 rounded shrink-0"
+          style={{ background: isBinome ? '#2980b9' : '#4A2C2A' }}>{resident.chambre}</span>
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-gray-900 truncate">{resident.nom} {resident.prenom}</p>
-          {resident.toilette && <p className="text-xs text-gray-400 truncate">{resident.toilette}</p>}
+          {toiletteBadge && (
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded mt-0.5 inline-block"
+              style={{ background: toiletteBadge.bg + '22', color: toiletteBadge.bg, fontSize: '9px' }}>
+              {toiletteBadge.label}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -33,7 +47,7 @@ function ResidentCard({ resident, isBinome, dragId }) {
 function SoignantColonne({ soignant, residents, onRemove, onRemoveBinome, canEdit }) {
   const { setNodeRef, isOver } = useDroppable({ id: `soignant-${soignant.id}` });
   return (
-    <div className="flex flex-col min-w-44 w-44 shrink-0">
+    <div className="flex flex-col min-w-60 w-60 shrink-0">
       <div className="rounded-t-xl p-2 text-center text-white text-xs font-bold" style={{ background: '#4A2C2A' }}>
         {soignant.label} <span className="opacity-60">({residents.length})</span>
       </div>
