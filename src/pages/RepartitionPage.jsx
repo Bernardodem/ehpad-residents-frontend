@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Settings, RefreshCw, Archive, Home, Printer } from 'lucide-react';
+import { ArrowLeft, Settings, RefreshCw, Archive, Home, Printer, Save, Clock, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, DragOverlay
@@ -125,6 +125,9 @@ export default function RepartitionPage() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [filtreEtageNonAff, setFiltreEtageNonAff] = useState('');
   const [filtreEtageRep, setFiltreEtageRep] = useState('');
+  const [showArchives, setShowArchives] = useState(false);
+  const [archives, setArchives] = useState([]);
+  const [archiveExpanded, setArchiveExpanded] = useState(null);
 
   const logout = () => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; };
 
@@ -168,6 +171,80 @@ export default function RepartitionPage() {
       }
       await load();
       toast.success('Répartition réinitialisée');
+    } catch { toast.error('Erreur'); }
+  };
+
+  const restaurerArchive = async (archive) => {
+    if (!window.confirm(
+      `Restaurer "${archive.nom}" ?\n\nCela va :\n1. Archiver la répartition actuelle\n2. Remplacer par la configuration sélectionnée\n\nContinuer ?`
+    )) return;
+    try {
+      // 1. Sauvegarder la répartition actuelle
+      if (affectations.length > 0) {
+        await api.post('/repartition/archives', {
+          config_id: configId,
+          nom: `Répartition du ${new Date().toLocaleDateString('fr-FR')} — ${config.nom} (avant restauration)`,
+          affectations: affectations.map(a => ({
+            chambre: a.chambre, nom: a.nom, prenom: a.prenom,
+            soignant_id: a.soignant_id, soignant_label: a.soignant_label,
+            binome_soignant_id: a.binome_soignant_id, binome_label: a.binome_label,
+          }))
+        });
+      }
+      // 2. Réinitialiser les affectations actuelles
+      for (const a of affectations) {
+        await api.patch(`/repartition/configs/${configId}/affectations/${a.chambre}`, { soignant_id: null });
+      }
+      // 3. Appliquer les affectations de l'archive
+      for (const a of (archive.affectations || [])) {
+        if (a.soignant_id) {
+          await api.patch(`/repartition/configs/${archive.config_id}/affectations/${a.chambre}`, {
+            soignant_id: a.soignant_id,
+            binome_soignant_id: a.binome_soignant_id || null
+          });
+        }
+      }
+      toast.success('Répartition restaurée');
+      setShowArchives(false);
+      await load();
+    } catch { toast.error('Erreur lors de la restauration'); }
+  };
+
+  const sauvegarderRepartition = async () => {
+    if (!config || affectations.length === 0) return toast.error('Aucune affectation à sauvegarder');
+    const nom = `Répartition du ${new Date().toLocaleDateString('fr-FR')} — ${config.nom}`;
+    try {
+      await api.post('/repartition/archives', {
+        config_id: configId,
+        nom,
+        affectations: affectations.map(a => ({
+          chambre: a.chambre,
+          nom: a.nom,
+          prenom: a.prenom,
+          soignant_id: a.soignant_id,
+          soignant_label: a.soignant_label,
+          binome_soignant_id: a.binome_soignant_id,
+          binome_label: a.binome_label,
+        }))
+      });
+      toast.success('Répartition sauvegardée');
+    } catch { toast.error('Erreur lors de la sauvegarde'); }
+  };
+
+  const chargerArchives = async () => {
+    try {
+      const { data } = await api.get('/repartition/archives');
+      setArchives(data);
+      setShowArchives(true);
+    } catch { toast.error('Erreur chargement archives'); }
+  };
+
+  const supprimerArchive = async (id) => {
+    if (!window.confirm('Supprimer cette archive ?')) return;
+    try {
+      await api.delete(`/repartition/archives/${id}`);
+      setArchives(a => a.filter(x => x.id !== id));
+      toast.success('Archive supprimée');
     } catch { toast.error('Erreur'); }
   };
 
@@ -420,6 +497,14 @@ export default function RepartitionPage() {
               <Printer size={15} /> Imprimer
             </button>
           )}
+          {config && isManager() && (
+            <button onClick={sauvegarderRepartition} className="px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
+              <Save size={15} /> Sauvegarder
+            </button>
+          )}
+          <button onClick={chargerArchives} className="px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
+            <Clock size={15} /> Historique
+          </button>
           {isManager() && (
             <button onClick={reinitialiser} className="ml-auto px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
               <RefreshCw size={15} /> Réinitialiser la configuration
@@ -488,6 +573,70 @@ export default function RepartitionPage() {
         )}
       </main>
       <Footer appSource="Résidents" />
+
+      {showArchives && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Historique des répartitions</h2>
+              <button onClick={() => setShowArchives(false)} className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft size={16} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {archives.length === 0 ? (
+                <p className="text-center text-gray-400 py-8">Aucune archive</p>
+              ) : archives.map(a => (
+                <div key={a.id} className="bg-gray-50 rounded-xl border border-gray-100">
+                  <div className="p-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-sm text-gray-900">{a.nom}</p>
+                      <p className="text-xs text-gray-400">{new Date(a.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setArchiveExpanded(e => e === a.id ? null : a.id)}
+                        className="p-2 hover:bg-gray-200 rounded-lg text-gray-500">
+                        {archiveExpanded === a.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                      </button>
+                      <button onClick={() => restaurerArchive(a)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-white"
+                        style={{ background: '#4A2C2A' }}>
+                        Restaurer
+                      </button>
+
+                    </div>
+                  </div>
+                  {archiveExpanded === a.id && (() => {
+                    // Grouper par soignant
+                    const bySoignant = {};
+                    for (const aff of (a.affectations || [])) {
+                      const key = aff.soignant_label || 'Non affecté';
+                      if (!bySoignant[key]) bySoignant[key] = [];
+                      bySoignant[key].push(aff);
+                    }
+                    return (
+                      <div className="px-3 pb-3 border-t border-gray-100 pt-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          {Object.entries(bySoignant).map(([soignant, resids]) => (
+                            <div key={soignant}>
+                              <p className="text-xs font-bold text-gray-500 mb-1" style={{ color: '#4A2C2A' }}>{soignant} ({resids.length})</p>
+                              {resids.sort((a,b) => a.chambre - b.chambre).map((r, i) => (
+                                <div key={i} className="flex items-center gap-1 text-xs py-0.5">
+                                  <span className="font-bold text-gray-400 w-7 shrink-0">{r.chambre}</span>
+                                  <span className="text-gray-700 truncate">{r.nom} {r.prenom}</span>
+                                  {r.binome_soignant_id && <span className="text-blue-400 shrink-0 text-xs">B</span>}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showConfigModal && (
         <ConfigModal configs={configs} onClose={() => setShowConfigModal(false)}
