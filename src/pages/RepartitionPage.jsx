@@ -110,6 +110,7 @@ export default function RepartitionPage() {
   const [activeResident, setActiveResident] = useState(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [filtreEtageNonAff, setFiltreEtageNonAff] = useState('');
+  const [filtreEtageRep, setFiltreEtageRep] = useState('');
 
   const logout = () => { localStorage.removeItem('sso_token'); localStorage.removeItem('sso_user'); localStorage.removeItem('sso_apps'); window.location.href = '/'; };
 
@@ -264,7 +265,7 @@ export default function RepartitionPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col" style={{ overflow: "hidden" }}>
       <div className="max-w-5xl w-full mx-auto px-4 pt-4">
         <div className="rounded-2xl px-5 py-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #3A2020, #5C3A37)' }}>
           <div className="flex sm:grid sm:grid-cols-3 items-center justify-between">
@@ -320,7 +321,7 @@ export default function RepartitionPage() {
         </div>
       </div>
 
-      <main className="flex-1 px-4 py-4 overflow-x-auto max-w-5xl w-full mx-auto">
+      <main className="flex-1 px-4 py-4 max-w-5xl w-full mx-auto" style={{ overflow: "hidden" }}>
         {loading ? (
           <div className="text-center py-16 text-gray-400">Chargement...</div>
         ) : !config ? (
@@ -330,12 +331,26 @@ export default function RepartitionPage() {
           </div>
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex gap-4 items-start">
-              <div className="w-48 shrink-0" style={{ position: 'sticky', top: '1rem', alignSelf: 'flex-start', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+            <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)', overflow: 'hidden' }}>
+              <div className="w-48 shrink-0" style={{ height: '100%', overflowY: 'auto' }}>
                 <NonAffectesZone residents={nonAffectesFiltres} filtres={filtresBtns} />
               </div>
-              <div className="flex-1 space-y-6 pb-4">
-                {Object.entries(soignantsByEtage).map(([etage, soignants]) => (
+              <div className="flex-1 space-y-6 pb-4 overflow-y-auto overflow-x-auto">
+                <div className="flex gap-1 flex-wrap mb-2">
+                  <button onClick={() => setFiltreEtageRep('')}
+                    className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                    style={{ background: filtreEtageRep === '' ? '#C9A84C' : '#4A2C2A', opacity: filtreEtageRep !== '' ? 0.5 : 1 }}>
+                    Tous
+                  </button>
+                  {Object.keys(soignantsByEtage).map(etage => (
+                    <button key={etage} onClick={() => setFiltreEtageRep(e => e === etage ? '' : etage)}
+                      className="px-3 h-7 rounded-lg text-xs font-bold text-white transition-all"
+                      style={{ background: filtreEtageRep === etage ? '#C9A84C' : '#4A2C2A', opacity: filtreEtageRep && filtreEtageRep !== etage ? 0.5 : 1 }}>
+                      {etage}
+                    </button>
+                  ))}
+                </div>
+                {Object.entries(soignantsByEtage).filter(([etage]) => !filtreEtageRep || etage === filtreEtageRep).map(([etage, soignants]) => (
                   <div key={etage}>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{etage}</p>
                     <div className="flex gap-3 overflow-x-auto pb-2">
