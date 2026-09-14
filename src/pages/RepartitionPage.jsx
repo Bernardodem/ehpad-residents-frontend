@@ -419,7 +419,7 @@ export default function RepartitionPage() {
         </div>
       </div>
 
-      <main className="flex-1 px-4 py-4 max-w-5xl w-full mx-auto" style={{ overflow: "hidden" }}>
+      <main className="flex-1 px-4 py-4 max-w-5xl w-full mx-auto" style={{ overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
         {loading ? (
           <div className="text-center py-16 text-gray-400">Chargement...</div>
         ) : !config ? (
@@ -429,7 +429,7 @@ export default function RepartitionPage() {
           </div>
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex gap-4" style={{ height: 'calc(100vh - 220px)', overflow: 'hidden' }}>
+            <div className="flex gap-4" style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
               <div className="w-48 shrink-0" style={{ height: '100%', overflowY: 'auto' }}>
                 <NonAffectesZone residents={nonAffectesFiltres} filtres={filtresBtns} />
               </div>
