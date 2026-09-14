@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Settings, RefreshCw, Archive, Home, Printer, Save, Clock, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Settings, RefreshCw, Archive, Home, Printer, Save, Clock, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, DragOverlay
@@ -125,6 +125,7 @@ export default function RepartitionPage() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [filtreEtageNonAff, setFiltreEtageNonAff] = useState('');
   const [filtreEtageRep, setFiltreEtageRep] = useState('');
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showArchives, setShowArchives] = useState(false);
   const [archives, setArchives] = useState([]);
   const [archiveExpanded, setArchiveExpanded] = useState(null);
@@ -214,6 +215,18 @@ export default function RepartitionPage() {
     if (!config || affectations.length === 0) return toast.error('Aucune affectation à sauvegarder');
     const nom = `Répartition du ${new Date().toLocaleDateString('fr-FR')} — ${config.nom}`;
     try {
+      // Vérifier si une archive existe déjà dans les dernières 24h pour cette config
+      const { data: existingArchives } = await api.get('/repartition/archives');
+      const last24h = existingArchives.find(a => {
+        const age = (Date.now() - new Date(a.created_at).getTime()) / 1000 / 3600;
+        return age < 24 && a.config_id === configId;
+      });
+      if (last24h) {
+        const confirm = window.confirm(
+          `Une répartition a déjà été sauvegardée il y a moins de 24h :\n"${last24h.nom}"\n\nVoulez-vous quand même sauvegarder à nouveau ?`
+        );
+        if (!confirm) return;
+      }
       await api.post('/repartition/archives', {
         config_id: configId,
         nom,
@@ -484,37 +497,82 @@ export default function RepartitionPage() {
           <a href="/residents/impressions" className="flex-1 py-2 px-3 rounded-lg text-sm font-medium text-center text-gray-500 hover:text-gray-700 no-underline">Impressions</a>
 
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {configs.map(c => (
-            <button key={c.id} onClick={() => setConfigId(c.id)}
-              className="px-4 py-1.5 rounded-xl text-sm font-medium"
-              style={{ background: configId === c.id ? '#C9A84C' : '#4A2C2A', color: 'white' }}>
-              {c.nom}
+        <div className="space-y-2">
+          {/* Ligne 1 : actions sur toute la largeur */}
+          {/* Desktop : boutons étalés */}
+          <div className="hidden sm:flex items-center justify-around gap-1">
+            {config && (
+              <button onClick={imprimerRepartition} className="px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-1.5">
+                <Printer size={14} /> Imprimer
+              </button>
+            )}
+            {config && isManager() && (
+              <button onClick={sauvegarderRepartition} className="px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-1.5">
+                <Save size={14} /> Sauvegarder
+              </button>
+            )}
+            <button onClick={chargerArchives} className="px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-1.5">
+              <Clock size={14} /> Historique
             </button>
-          ))}
-          {config && (
-            <button onClick={imprimerRepartition} className="px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
-              <Printer size={15} /> Imprimer
+            {isManager() && (
+              <button onClick={reinitialiser} className="px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-1.5">
+                <RefreshCw size={14} /> Réinitialiser
+              </button>
+            )}
+            {isManager() && (
+              <button onClick={() => setShowConfigModal(true)} className="px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-1.5">
+                <Settings size={14} /> Paramètres
+              </button>
+            )}
+          </div>
+          {/* Mobile : burger menu */}
+          <div className="flex sm:hidden items-center justify-between relative">
+            <button onClick={() => setShowActionsMenu(m => !m)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white"
+              style={{ background: '#4A2C2A' }}>
+              <span>Actions</span>
+              <ChevronDown size={14} />
             </button>
-          )}
-          {config && isManager() && (
-            <button onClick={sauvegarderRepartition} className="px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
-              <Save size={15} /> Sauvegarder
-            </button>
-          )}
-          <button onClick={chargerArchives} className="px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
-            <Clock size={15} /> Historique
-          </button>
-          {isManager() && (
-            <button onClick={reinitialiser} className="ml-auto px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
-              <RefreshCw size={15} /> Réinitialiser la configuration
-            </button>
-          )}
-          {isManager() && (
-            <button onClick={() => setShowConfigModal(true)} className="px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-600 text-sm font-medium flex items-center gap-2">
-              <Settings size={15} /> Paramètres de configuration
-            </button>
-          )}
+            {showActionsMenu && (
+              <div className="absolute top-10 left-0 bg-white rounded-xl shadow-lg border border-gray-100 z-20 py-1 min-w-48"
+                onClick={() => setShowActionsMenu(false)}>
+                {config && (
+                  <button onClick={imprimerRepartition} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <Printer size={14} /> Imprimer
+                  </button>
+                )}
+                {config && isManager() && (
+                  <button onClick={sauvegarderRepartition} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <Save size={14} /> Sauvegarder
+                  </button>
+                )}
+                <button onClick={chargerArchives} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                  <Clock size={14} /> Historique
+                </button>
+                {isManager() && <hr className="my-1 border-gray-100" />}
+                {isManager() && (
+                  <button onClick={reinitialiser} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <RefreshCw size={14} /> Réinitialiser
+                  </button>
+                )}
+                {isManager() && (
+                  <button onClick={() => setShowConfigModal(true)} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <Settings size={14} /> Paramètres
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Ligne 2 : sélection de la répartition centrée */}
+          <div className="flex items-center justify-center gap-2">
+            {configs.map(c => (
+              <button key={c.id} onClick={() => setConfigId(c.id)}
+                className="px-4 py-1.5 rounded-xl text-sm font-medium"
+                style={{ background: configId === c.id ? '#C9A84C' : '#4A2C2A', color: 'white' }}>
+                {c.nom}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -579,7 +637,7 @@ export default function RepartitionPage() {
           <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-base font-bold text-gray-900">Historique des répartitions</h2>
-              <button onClick={() => setShowArchives(false)} className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft size={16} /></button>
+              <button onClick={() => setShowArchives(false)} className="p-2 hover:bg-gray-100 rounded-lg"><X size={16} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {archives.length === 0 ? (
