@@ -16,6 +16,17 @@ function formatProt(type, taille, slot) {
   return `${type}${taille ? ' ' + taille : ''} ${couleur(slot)}`;
 }
 
+function formatProtFabricant(type, taille, slot) {
+  if (!type || type === 'Aucune' || type === '' || type === '—') return null;
+  const isNuit = slot === 'prot_s' || slot === 'prot_n';
+  const t = taille ? ` ${taille}` : '';
+  if (type === 'Protection légère') return 'ID Light Essential Super';
+  if (type === 'Complète') return isNuit ? `ID Expert Slip Super Vert${t}` : `ID Expert Slip Extra Plus Jaune${t}`;
+  if (type === 'Pants') return `ID Sensitive Pants Extra Plus${t}`;
+  if (type === 'Anaform') return isNuit ? 'ID Sensitive Form Maxi' : 'ID Expert Form Extra';
+  return `${type}${t}`;
+}
+
 function apptLabel(n) {
   if (n === 1) return 'Appartement 1 — Rez-de-chaussée';
   if (n === 2) return 'Appartement 2 — 1er étage';
@@ -184,12 +195,7 @@ export default function ImpressionsPage() {
         ? ['prot_n']
         : ['prot_m', 'prot_am', 'prot_s', 'prot_n'];
 
-      const fmt = (type, taille, slot) => {
-        if (!type || type === 'Aucune' || type === '') return null;
-        const couleur = slot === 'prot_s' ? 'Vert' : 'Jaune';
-        if (type === 'Anaform' || type === 'Protection légère' || type === 'Pants') return type;
-        return `${type}${taille ? ' ' + taille : ''} ${couleur}`;
-      };
+      const fmt = formatProtFabricant;
 
       const apptsFiltres = filtreApptDotation
         ? [parseInt(filtreApptDotation)]
@@ -246,7 +252,19 @@ export default function ImpressionsPage() {
 </div>`;
 
       sections.forEach(({ appt, counts, nbRes }) => {
-        const entries = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+        const TAILLE_ORDER = ['S', 'M', 'L', 'XL', 'XXL'];
+        const getTailleOrder = (key) => {
+          for (const t of TAILLE_ORDER) {
+            if (key.endsWith(' ' + t)) return TAILLE_ORDER.indexOf(t);
+          }
+          return -1;
+        };
+        const entries = Object.entries(counts).sort((a, b) => {
+          const baseA = a[0].replace(/ (S|M|L|XL|XXL)$/, '');
+          const baseB = b[0].replace(/ (S|M|L|XL|XXL)$/, '');
+          if (baseA !== baseB) return baseA.localeCompare(baseB);
+          return getTailleOrder(a[0]) - getTailleOrder(b[0]);
+        });
         const totalJ = Object.values(counts).reduce((a, b) => a + b, 0);
         html += `<h3>${apptLabel(appt)} — ${nbRes} résident(s)</h3>
 <table>
@@ -277,7 +295,19 @@ export default function ImpressionsPage() {
       });
 
       if (apptsFiltres.length > 1) {
-        const entries = Object.entries(totalGlobal).sort((a, b) => a[0].localeCompare(b[0]));
+        const TAILLE_ORDER2 = ['S', 'M', 'L', 'XL', 'XXL'];
+        const getTailleOrder2 = (key) => {
+          for (const t of TAILLE_ORDER2) {
+            if (key.endsWith(' ' + t)) return TAILLE_ORDER2.indexOf(t);
+          }
+          return -1;
+        };
+        const entries = Object.entries(totalGlobal).sort((a, b) => {
+          const baseA = a[0].replace(/ (S|M|L|XL|XXL)$/, '');
+          const baseB = b[0].replace(/ (S|M|L|XL|XXL)$/, '');
+          if (baseA !== baseB) return baseA.localeCompare(baseB);
+          return getTailleOrder2(a[0]) - getTailleOrder2(b[0]);
+        });
         const totalJ = Object.values(totalGlobal).reduce((a, b) => a + b, 0);
         html += `<div class="grand-total">
 <h3 style="border-bottom:2px solid #4A2C2A;color:#4A2C2A">TOTAL ÉTABLISSEMENT</h3>
@@ -910,7 +940,7 @@ export default function ImpressionsPage() {
       <div style="font-size:10px;font-weight:bold;color:#555;margin-bottom:6px;">🧼 NURSING</div>
       <div>Lieu : ${r.toilette || '—'}</div>
       <div>Mode dépl. : ${r.mode_depl || r.deplacement || '—'}</div>
-      ${hasProt ? `<div style="margin-top:8px;font-size:10px;font-weight:bold;color:#555;">🩺 PROTECTIONS</div>${prots.map(p => `<div>${p}${r.prot_taille ? ' ' + r.prot_taille : ''}</div>`).join('')}` : ''}
+      ${hasProt ? `<div style="margin-top:8px;font-size:10px;font-weight:bold;color:#555;">🩺 PROTECTIONS</div>${prots.map(p => `<div>${p}</div>`).join('')}` : ''}
       ${hasProtheses ? `<div style="margin-top:8px;font-size:10px;font-weight:bold;color:#555;">🦷 PROTHÈSES</div>${r.prot_dent ? '<div>🦷 Dentier</div>' : ''}${r.prot_aud ? '<div>👂 Auditif</div>' : ''}${r.lunettes ? '<div>👓 Lunettes</div>' : ''}` : ''}
     </div>
     <div style="flex:1;">
@@ -992,12 +1022,7 @@ export default function ImpressionsPage() {
         return `Appartement ${n}`;
       };
 
-      const fmt = (type, taille, slot) => {
-        if (!type || type === 'Aucune' || type === '') return null;
-        if (type === 'Anaform' || type === 'Protection légère' || type === 'Pants') return type;
-        const couleur = slot === 'prot_s' ? 'Vert' : 'Jaune';
-        return `${type}${taille ? ' ' + taille : ''} ${couleur}`;
-      };
+      const fmt = formatProtFabricant;
 
       let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Détail protections — Arc-en-Ciel</title>

@@ -141,11 +141,13 @@ export default function FichePage() {
               </Section>
 
               <Section title="Protections">
-                <Select label="Matin" value={form.prot_m} onChange={v => set('prot_m', v)} options={K.PROTECTIONS} placeholder="—" />
-                <Select label="Après-midi" value={form.prot_am} onChange={v => set('prot_am', v)} options={K.PROTECTIONS} placeholder="—" />
-                <Select label="Soir" value={form.prot_s} onChange={v => set('prot_s', v)} options={K.PROTECTIONS} placeholder="—" />
-                <Select label="Nuit" value={form.prot_n} onChange={v => set('prot_n', v)} options={K.PROTECTIONS} placeholder="—" />
-                <Select label="Taille" value={form.prot_taille} onChange={v => set('prot_taille', v)} options={K.PROT_TAILLES} placeholder="—" />
+                <Select label="Matin" value={form.prot_m} onChange={v => { set('prot_m', v); if (!['Complète','Pants'].includes(v) && !['Complète','Pants'].some(t => [form.prot_am, form.prot_s, form.prot_n].includes(t))) set('prot_taille', ''); }} options={K.PROTECTIONS} placeholder="—" />
+                <Select label="Après-midi" value={form.prot_am} onChange={v => { set('prot_am', v); if (!['Complète','Pants'].includes(v) && !['Complète','Pants'].some(t => [form.prot_m, form.prot_s, form.prot_n].includes(t))) set('prot_taille', ''); }} options={K.PROTECTIONS} placeholder="—" />
+                <Select label="Soir" value={form.prot_s} onChange={v => { set('prot_s', v); if (!['Complète','Pants'].includes(v) && !['Complète','Pants'].some(t => [form.prot_m, form.prot_am, form.prot_n].includes(t))) set('prot_taille', ''); }} options={K.PROTECTIONS} placeholder="—" />
+                <Select label="Nuit" value={form.prot_n} onChange={v => { set('prot_n', v); if (!['Complète','Pants'].includes(v) && !['Complète','Pants'].some(t => [form.prot_m, form.prot_am, form.prot_s].includes(t))) set('prot_taille', ''); }} options={K.PROTECTIONS} placeholder="—" />
+                {(['Complète','Pants'].some(t => [form.prot_m, form.prot_am, form.prot_s, form.prot_n].includes(t))) && (
+                  <Select label="Taille *" value={form.prot_taille} onChange={v => set('prot_taille', v)} options={K.PROT_TAILLES} placeholder="— obligatoire —" />
+                )}
                 <Toggle label="MAE" value={form.mae} onChange={v => set('mae', v)} />
               </Section>
 
