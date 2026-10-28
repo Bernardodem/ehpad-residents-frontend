@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { Home, Printer, Users } from 'lucide-react';
@@ -25,6 +26,33 @@ function formatProtFabricant(type, taille, slot) {
   if (type === 'Pants') return `ID Sensitive Pants Extra Plus${t}`;
   if (type === 'Anaform') return isNuit ? 'ID Sensitive Form Maxi' : 'ID Expert Form Extra';
   return `${type}${t}`;
+}
+
+// Rapprochement avec l'app Stocks : appellation interne (sinon denomination) + taille, "NC" = sans taille
+const normaliserNom = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+function indexConditionnements(produits) {
+  const idx = {};
+  (produits || []).forEach(p => {
+    const taille = p.taille && p.taille.toUpperCase() !== 'NC' ? ' ' + p.taille : '';
+    idx[normaliserNom((p.appellation_interne || p.denomination) + taille)] = p;
+  });
+  return idx;
+}
+
+// Libelle fabricant de la dotation -> appellation interne saisie dans Stocks (la taille suit)
+const APPELLATIONS_INTERNES = [
+  ['ID Expert Slip Extra Plus Jaune', 'Complète jaune'],
+  ['ID Expert Slip Super Vert', 'Complète verte nuit'],
+  ['ID Expert Form Extra', 'Anaform jour'],
+  ['ID Sensitive Form Maxi', 'Anaform nuit'],
+  ['ID Light Essential Super', 'Protection légère'],
+  ['ID Sensitive Pants Extra Plus', 'Pants'],
+];
+
+function appellationInterne(label) {
+  const m = APPELLATIONS_INTERNES.find(([fab]) => label === fab || label.startsWith(fab + ' '));
+  return m ? m[1] + label.slice(m[0].length) : label;
 }
 
 function apptLabel(n) {
@@ -175,9 +203,34 @@ export default function ImpressionsPage() {
   const [carteAppt, setCarteAppt] = useState('');
   const [carteEtage, setCarteEtage] = useState('');
 
+  // Conditionnements de l'app Stocks (meme jeton SSO), pour la colonne Sachets/mois de la dotation protections
+  const [condStocks, setCondStocks] = useState(null);
+  useEffect(() => {
+    axios.get('/stocks/api/public/conditionnements', { headers: { Authorization: `Bearer ${localStorage.getItem('sso_token')}` } })
+      .then(r => setCondStocks(r.data))
+      .catch(() => setCondStocks(null));
+  }, []);
+
   const handlePrint = (docId) => {
     if (docId === 'dotation-prot') {
       const today = new Date().toLocaleDateString('fr-FR');
+
+      const idxCond = indexConditionnements(condStocks);
+      const nonTrouves = new Set();
+      let sansNombre = false;
+      // Arrondi au sachet superieur ; null si le produit ou son nombre d'unites est inconnu
+      const sachetsMois = (label, qteJ) => {
+        const nom = appellationInterne(label);
+        const p = idxCond[normaliserNom(nom)] || idxCond[normaliserNom(label)];
+        if (!p) { nonTrouves.add(nom); return null; }
+        if (p.conditionnement_type === 'unite' || !p.conditionnement_quantite) { sansNombre = true; return null; }
+        return Math.ceil(qteJ * 30 / p.conditionnement_quantite);
+      };
+      const lignesSachets = entries => {
+        const vals = entries.map(([type, qteJ]) => sachetsMois(type, qteJ));
+        return { vals, total: vals.every(v => v !== null) ? vals.reduce((a, b) => a + b, 0) : null };
+      };
+      const cell = v => v === null ? '—' : v;
       const slotLabel = { tout: 'Jour + Nuit', jour: 'Jour (Matin, Après-midi, Soir)', nuit: 'Nuit' };
 
       const apptLabel = (n) => {
@@ -276,13 +329,14 @@ export default function ImpressionsPage() {
     <th class="num">Sachets/mois*</th>
   </tr></thead>
   <tbody>`;
-        entries.forEach(([type, qteJ]) => {
+        const sachets = lignesSachets(entries);
+        entries.forEach(([type, qteJ], k) => {
           html += `<tr>
     <td>${type}</td>
     <td class="num">${qteJ}</td>
     <td class="num">${qteJ * 7}</td>
     <td class="num">${qteJ * 30}</td>
-    <td class="num">—</td>
+    <td class="num">${cell(sachets.vals[k])}</td>
   </tr>`;
         });
         html += `<tr class="total-row">
@@ -290,7 +344,7 @@ export default function ImpressionsPage() {
     <td class="num">${totalJ}</td>
     <td class="num">${totalJ * 7}</td>
     <td class="num">${totalJ * 30}</td>
-    <td class="num">—</td>
+    <td class="num">${cell(sachets.total)}</td>
   </tr></tbody></table>`;
       });
 
@@ -320,13 +374,14 @@ export default function ImpressionsPage() {
     <th class="num">Sachets/mois*</th>
   </tr></thead>
   <tbody>`;
-        entries.forEach(([type, qteJ]) => {
+        const sachets = lignesSachets(entries);
+        entries.forEach(([type, qteJ], k) => {
           html += `<tr>
     <td>${type}</td>
     <td class="num">${qteJ}</td>
     <td class="num">${qteJ * 7}</td>
     <td class="num">${qteJ * 30}</td>
-    <td class="num">—</td>
+    <td class="num">${cell(sachets.vals[k])}</td>
   </tr>`;
         });
         html += `<tr class="total-row">
@@ -334,11 +389,15 @@ export default function ImpressionsPage() {
     <td class="num">${totalJ}</td>
     <td class="num">${totalJ * 7}</td>
     <td class="num">${totalJ * 30}</td>
-    <td class="num">—</td>
+    <td class="num">${cell(sachets.total)}</td>
   </tr></tbody></table></div>`;
       }
 
-      html += `<div class="note">* Colonne Sachets/mois disponible après mise à jour du champ conditionnement dans l'app Stocks</div>
+      const notes = ["* Sachets/mois : unités/mois divisées par le nombre d'unités du sachet dans l'app Stocks, arrondi au sachet supérieur."];
+      if (!condStocks) notes.push("— Conditionnements de l'app Stocks indisponibles.");
+      if (nonTrouves.size) notes.push(`— Introuvable dans l'app Stocks (renseigner l'appellation interne du produit) : ${[...nonTrouves].sort().join(', ')}.`);
+      if (sansNombre) notes.push("— Nombre d'unités par sachet non renseigné dans l'app Stocks pour certains produits.");
+      html += `<div class="note">${notes.join('<br>')}</div>
 <div class="doc-footer">${today} — Dotation protections — Arc-en-Ciel</div>
 </body></html>`;
 
